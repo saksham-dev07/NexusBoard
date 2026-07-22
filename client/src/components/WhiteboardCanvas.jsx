@@ -5,6 +5,8 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     tool,
     color,
     width,
+    lineStyle = 'solid',
+    selectedStamp = '🚀',
     strokes,
     cursors,
     bgTheme = 'grid-lines',
@@ -23,6 +25,9 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   const ctxRef = useRef(null);
   const isDrawingRef = useRef(false);
   const currentPathRef = useRef([]);
+
+  // In-memory image object cache
+  const imgCacheRef = useRef({});
 
   // Selection state
   const [selectedStrokeId, setSelectedStrokeId] = useState(null);
@@ -92,6 +97,16 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
       const computedH = Math.max(160, 44 + lines.length * 18);
       const h = stroke.cardHeight || computedH;
       return { x: start.x, y: start.y, width: w, height: h };
+    }
+
+    if (stroke.tool === 'image') {
+      const start = path[0] || { x: 0, y: 0 };
+      return { x: start.x, y: start.y, width: stroke.imgWidth || 200, height: stroke.imgHeight || 150 };
+    }
+
+    if (stroke.tool === 'stamp') {
+      const start = path[0] || { x: 0, y: 0 };
+      return { x: start.x - 24, y: start.y - 24, width: 48, height: 48 };
     }
 
     if (path.length === 0) return null;
@@ -242,6 +257,15 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     targetCtx.lineCap = 'round';
     targetCtx.lineJoin = 'round';
 
+    // Apply Dash Pattern (Solid / Dashed / Dotted)
+    if (stroke.lineStyle === 'dashed') {
+      targetCtx.setLineDash([8, 8]);
+    } else if (stroke.lineStyle === 'dotted') {
+      targetCtx.setLineDash([3, 6]);
+    } else {
+      targetCtx.setLineDash([]);
+    }
+
     const strokeColor = stroke.color || '#000000';
     const strokeWidth = stroke.width || 5;
 
@@ -257,7 +281,43 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
 
     const path = stroke.path || [];
 
-    if (stroke.tool === 'sticky') {
+    if (stroke.tool === 'image') {
+      if (path.length > 0 && stroke.src) {
+        const x = path[0].x;
+        const y = path[0].y;
+        const w = stroke.imgWidth || 200;
+        const h = stroke.imgHeight || 150;
+
+        let img = imgCacheRef.current[stroke.src];
+        if (!img) {
+          img = new Image();
+          img.src = stroke.src;
+          img.onload = () => {
+            if (canvasRef.current && ctxRef.current) {
+              const rect = canvasRef.current.getBoundingClientRect();
+              drawBackgroundPattern(ctxRef.current, rect.width, rect.height, zoom, panOffset, bgTheme);
+            }
+          };
+          imgCacheRef.current[stroke.src] = img;
+        }
+
+        if (img.complete && img.naturalWidth !== 0) {
+          targetCtx.drawImage(img, x, y, w, h);
+        } else {
+          targetCtx.strokeStyle = '#cbd5e1';
+          targetCtx.strokeRect(x, y, w, h);
+        }
+      }
+    } else if (stroke.tool === 'stamp') {
+      if (path.length > 0) {
+        const x = path[0].x;
+        const y = path[0].y;
+        targetCtx.font = '36px sans-serif';
+        targetCtx.textAlign = 'center';
+        targetCtx.textBaseline = 'middle';
+        targetCtx.fillText(stroke.stamp || '🚀', x, y);
+      }
+    } else if (stroke.tool === 'sticky') {
       if (path.length > 0) {
         const x = path[0].x;
         const y = path[0].y;
@@ -578,7 +638,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     }
 
     targetCtx.restore();
-  }, [zoom, panOffset]);
+  }, [zoom, panOffset, bgTheme]);
 
   // Redraw all strokes with Zoom, Pan, Offscreen Layering, Selection Bounding Box, and Background Theme applied
   const redrawAll = useCallback((strokeList, extraStroke = null) => {
@@ -805,7 +865,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
       return box && pt.x >= box.x && pt.x <= box.x + box.width && pt.y >= box.y && pt.y <= box.y + box.height;
     });
 
-    if (clickedStroke) {
+    if (clickedStroke && clickedStroke.tool !== 'image' && clickedStroke.tool !== 'stamp') {
       const startPt = clickedStroke.path[0] || pt;
       setCardInput({
         type: clickedStroke.tool,
@@ -859,6 +919,19 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
         setSelectedStrokeId(null);
         setSelectionBox({ startX: pt.x, startY: pt.y, currentX: pt.x, currentY: pt.y });
       }
+      return;
+    }
+
+    if (tool === 'stamp') {
+      if (onFinishStroke) {
+        onFinishStroke({
+          id: `stroke_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          tool: 'stamp',
+          stamp: selectedStamp || '🚀',
+          path: [pt],
+        });
+      }
+      if (onSelectTool) onSelectTool('select');
       return;
     }
 
@@ -936,6 +1009,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
       tool,
       color,
       width,
+      lineStyle,
       path: currentPathRef.current,
     });
   };
@@ -977,6 +1051,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
         tool,
         color,
         width,
+        lineStyle,
         path,
       });
     }

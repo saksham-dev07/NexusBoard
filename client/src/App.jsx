@@ -16,6 +16,8 @@ export default function App() {
   const [tool, setTool] = useState('pen');
   const [color, setColor] = useState('#000000');
   const [width, setWidth] = useState(5);
+  const [lineStyle, setLineStyle] = useState('solid'); // 'solid' | 'dashed' | 'dotted'
+  const [selectedStamp, setSelectedStamp] = useState('🚀');
   const [bgTheme, setBgTheme] = useState('grid-lines');
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [isPresentationMode, setIsPresentationMode] = useState(false);
@@ -103,6 +105,49 @@ export default function App() {
     emitDraw(fullStroke);
   };
 
+  const handleImageUpload = (base64Data) => {
+    if (!base64Data) return;
+    const newStroke = {
+      id: `stroke_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      tool: 'image',
+      src: base64Data,
+      path: [{ x: 100, y: 100 }],
+      imgWidth: 260,
+      imgHeight: 180,
+      roomId,
+      timestamp: Date.now(),
+    };
+    emitDraw(newStroke);
+    setTool('select');
+  };
+
+  const handleImportJSON = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target.result);
+        const importedStrokes = data.strokes || (Array.isArray(data) ? data : []);
+
+        importedStrokes.forEach(st => {
+          if (st && st.tool) {
+            emitDraw({
+              ...st,
+              id: st.id || `stroke_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+              roomId,
+            });
+          }
+        });
+      } catch (err) {
+        console.error('Import JSON failed:', err);
+        setError('Failed to import JSON file');
+      }
+    };
+    reader.readAsText(file);
+  };
+
   const handleExport = (format) => {
     try {
       const link = document.createElement('a');
@@ -160,6 +205,8 @@ export default function App() {
         setColor('#fef08a');
       } else if (k === 'k') {
         setTool('code');
+      } else if (k === 'x') {
+        setTool('stamp');
       } else if (k === 'd') {
         setTool('decision');
       } else if (k === 'b') {
@@ -244,6 +291,8 @@ export default function App() {
         tool={tool}
         color={color}
         width={width}
+        lineStyle={lineStyle}
+        selectedStamp={selectedStamp}
         strokes={strokes}
         cursors={cursors}
         bgTheme={bgTheme}
@@ -282,11 +331,17 @@ export default function App() {
           setColor={setColor}
           width={width}
           setWidth={setWidth}
+          lineStyle={lineStyle}
+          setLineStyle={setLineStyle}
+          selectedStamp={selectedStamp}
+          setSelectedStamp={setSelectedStamp}
           bgTheme={bgTheme}
           setBgTheme={setBgTheme}
           onUndo={emitUndo}
           onClear={emitClear}
           onExport={handleExport}
+          onImportJSON={handleImportJSON}
+          onImageUpload={handleImageUpload}
           onTogglePresentation={() => setIsPresentationMode(prev => !prev)}
         />
       )}
