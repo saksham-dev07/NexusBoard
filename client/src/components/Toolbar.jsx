@@ -105,9 +105,9 @@ export default function Toolbar({
   };
 
   return (
-    <div className="absolute top-4 right-4 z-40 flex flex-col space-y-2.5 bg-white/85 backdrop-blur-xl border border-slate-200/80 p-3 rounded-2xl shadow-xl shadow-slate-200/50 w-80 max-h-[calc(100vh-2rem)] overflow-y-auto transition-all">
-      {/* Categorized Tools Sections */}
-      <div className="space-y-2.5">
+    <div className="absolute top-4 right-4 z-40 flex flex-col space-y-2 bg-white/85 backdrop-blur-xl border border-slate-200/80 p-3 rounded-2xl shadow-xl shadow-slate-200/50 w-80 max-h-[calc(100vh-2rem)] overflow-y-auto transition-all">
+      {/* Categorized Tools Sections (Horizontal Scroll Single Row per Category) */}
+      <div className="space-y-2">
         {CATEGORIZED_TOOLS.map(cat => (
           <div key={cat.category} className="space-y-1">
             <div className="flex items-center justify-between px-0.5">
@@ -115,7 +115,7 @@ export default function Toolbar({
                 {cat.category}
               </span>
             </div>
-            <div className="grid grid-cols-4 gap-1 bg-slate-100/80 p-1 rounded-xl">
+            <div className="flex space-x-1.5 overflow-x-auto py-1 px-1 bg-slate-100/80 rounded-xl scrollbar-thin scrollbar-thumb-slate-300 select-none">
               {cat.items.map(t => (
                 <button
                   key={t.id}
@@ -126,7 +126,7 @@ export default function Toolbar({
                     }
                   }}
                   title={`${t.label} (Press ${t.key})`}
-                  className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-lg transition-all ${
+                  className={`flex-shrink-0 flex flex-col items-center justify-center py-1.5 px-2.5 min-w-[54px] rounded-lg transition-all ${
                     tool === t.id
                       ? 'bg-white text-blue-600 shadow-sm scale-105 font-bold'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/50 font-medium'
@@ -135,7 +135,7 @@ export default function Toolbar({
                   <svg className="w-3.5 h-3.5 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d={t.icon} />
                   </svg>
-                  <span className="text-[9px] truncate max-w-full">{t.label}</span>
+                  <span className="text-[9px] whitespace-nowrap">{t.label}</span>
                 </button>
               ))}
             </div>
@@ -149,12 +149,12 @@ export default function Toolbar({
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-700">
             Select Emoji Stamp
           </span>
-          <div className="grid grid-cols-4 gap-1">
+          <div className="flex space-x-1 overflow-x-auto py-0.5 scrollbar-thin scrollbar-thumb-amber-200">
             {EMOJI_STAMPS.map(s => (
               <button
                 key={s}
                 onClick={() => setSelectedStamp(s)}
-                className={`py-1 text-lg rounded-lg transition-transform ${
+                className={`flex-shrink-0 px-2 py-0.5 text-lg rounded-lg transition-transform ${
                   selectedStamp === s ? 'bg-white shadow-md scale-110 ring-2 ring-amber-400' : 'hover:bg-white/50'
                 }`}
               >
