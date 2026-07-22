@@ -1,0 +1,1013 @@
+import React, { useRef, useEffect, useCallback, forwardRef, useImperativeHandle, useState } from 'react';
+
+const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
+  {
+    tool,
+    color,
+    width,
+    strokes,
+    cursors,
+    bgTheme = 'grid-lines',
+    onFinishStroke,
+    onUpdateStroke,
+    onDeleteStroke,
+    onCursorMove,
+    onLaserMove,
+    remoteLaserEvents,
+    onSelectTool,
+    onViewportChange,
+  },
+  ref
+) {
+  const canvasRef = useRef(null);
+  const ctxRef = useRef(null);
+  const isDrawingRef = useRef(false);
+  const currentPathRef = useRef([]);
+
+  // Selection state
+  const [selectedStrokeId, setSelectedStrokeId] = useState(null);
+  const [selectionBox, setSelectionBox] = useState(null); // { startX, startY, currentX, currentY }
+  const isDraggingSelectedRef = useRef(false);
+  const dragStartWorldRef = useRef({ x: 0, y: 0 });
+
+  // Offscreen layer canvas ref to allow true destination-out erasing without destroying background grid
+  const offscreenCanvasRef = useRef(null);
+  if (!offscreenCanvasRef.current && typeof document !== 'undefined') {
+    offscreenCanvasRef.current = document.createElement('canvas');
+  }
+
+  // Viewport State (Zoom & Pan)
+  const [zoom, setZoom] = useState(1);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isSpacePressed, setIsSpacePressed] = useState(false);
+
+  const isPanningRef = useRef(false);
+  const startPanRef = useRef({ x: 0, y: 0 });
+
+  // Notify parent of viewport changes
+  useEffect(() => {
+    if (onViewportChange) {
+      onViewportChange({ zoom, panOffset });
+    }
+  }, [zoom, panOffset, onViewportChange]);
+
+  // Text / Sticky / Code card inline input state: { type: 'text'|'sticky'|'code', x, y, value, editingStrokeId }
+  const [cardInput, setCardInput] = useState(null);
+
+  // Laser points ref: array of { x, y, timestamp, color }
+  const laserTrailRef = useRef([]);
+  const animFrameRef = useRef(null);
+
+  // Convert screen coordinates to world space coordinates
+  const getCanvasPoint = useCallback((e) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+    return {
+      x: (screenX - panOffset.x) / zoom,
+      y: (screenY - panOffset.y) / zoom,
+    };
+  }, [zoom, panOffset]);
+
+  // Bounding box calculation helper
+  const getStrokeBoundingBox = useCallback((stroke) => {
+    if (!stroke) return null;
+    const path = stroke.path || [];
+
+    if (stroke.tool === 'sticky') {
+      const start = path[0] || { x: 0, y: 0 };
+      const w = stroke.cardWidth || 180;
+      const lines = (stroke.text || '').split('\n');
+      const computedH = Math.max(140, 40 + lines.length * 20);
+      const h = stroke.cardHeight || computedH;
+      return { x: start.x, y: start.y, width: w, height: h };
+    }
+
+    if (stroke.tool === 'code') {
+      const start = path[0] || { x: 0, y: 0 };
+      const w = stroke.cardWidth || 260;
+      const lines = (stroke.text || '').split('\n');
+      const computedH = Math.max(160, 44 + lines.length * 18);
+      const h = stroke.cardHeight || computedH;
+      return { x: start.x, y: start.y, width: w, height: h };
+    }
+
+    if (path.length === 0) return null;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+    path.forEach(pt => {
+      if (pt.x < minX) minX = pt.x;
+      if (pt.y < minY) minY = pt.y;
+      if (pt.x > maxX) maxX = pt.x;
+      if (pt.y > maxY) maxY = pt.y;
+    });
+
+    const pad = Math.max(8, (stroke.width || 5) / 2);
+    return {
+      x: minX - pad,
+      y: minY - pad,
+      width: Math.max(16, (maxX - minX) + pad * 2),
+      height: Math.max(16, (maxY - minY) + pad * 2),
+    };
+  }, []);
+
+  // Setup canvas high DPI
+  const setupCanvasContext = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    canvas.style.width = `${rect.width}px`;
+    canvas.style.height = `${rect.height}px`;
+
+    if (offscreenCanvasRef.current) {
+      offscreenCanvasRef.current.width = rect.width * dpr;
+      offscreenCanvasRef.current.height = rect.height * dpr;
+    }
+
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.imageSmoothingEnabled = true;
+
+    ctxRef.current = ctx;
+    return ctx;
+  }, []);
+
+  // Draw background pattern in screen space
+  const drawBackgroundPattern = (ctx, width, height, currentZoom, currentPan, theme) => {
+    const dpr = window.devicePixelRatio || 1;
+    const W = width * dpr;
+    const H = height * dpr;
+
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    if (theme === 'dark-mode') {
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, W, H);
+    } else {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    if (theme === 'blank') {
+      ctx.restore();
+      return;
+    }
+
+    const gridSize = 24 * currentZoom * dpr;
+    const startX = (currentPan.x * dpr) % gridSize;
+    const startY = (currentPan.y * dpr) % gridSize;
+
+    if (theme === 'dot-grid') {
+      ctx.fillStyle = theme === 'dark-mode' ? '#334155' : '#cbd5e1';
+      for (let x = startX; x < W; x += gridSize) {
+        for (let y = startY; y < H; y += gridSize) {
+          ctx.beginPath();
+          ctx.arc(x, y, 1.5 * dpr, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+      }
+    } else if (theme === 'grid-lines' || theme === 'dark-mode') {
+      ctx.strokeStyle = theme === 'dark-mode' ? '#1e293b' : '#f1f5f9';
+      ctx.lineWidth = 1 * dpr;
+      ctx.beginPath();
+      for (let x = startX; x < W; x += gridSize) {
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, H);
+      }
+      for (let y = startY; y < H; y += gridSize) {
+        ctx.moveTo(0, y);
+        ctx.lineTo(W, y);
+      }
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  };
+
+  // Draw arrow head helper
+  const drawArrowHead = (ctx, fromX, fromY, toX, toY, headLength = 15) => {
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const angle = Math.atan2(dy, dx);
+    ctx.beginPath();
+    ctx.moveTo(toX, toY);
+    ctx.lineTo(toX - headLength * Math.cos(angle - Math.PI / 6), toY - headLength * Math.sin(angle - Math.PI / 6));
+    ctx.moveTo(toX, toY);
+    ctx.lineTo(toX - headLength * Math.cos(angle + Math.PI / 6), toY - headLength * Math.sin(angle + Math.PI / 6));
+    ctx.stroke();
+  };
+
+  // Text wrapper helper with explicit newline \n support
+  const wrapText = (ctx, text, x, y, maxWidth, lineHeight) => {
+    const paragraphs = (text || '').split('\n');
+    let curY = y;
+
+    paragraphs.forEach(paragraph => {
+      const words = paragraph.split(' ');
+      let line = '';
+
+      for (let n = 0; n < words.length; n++) {
+        const testLine = line + words[n] + ' ';
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > maxWidth && n > 0) {
+          ctx.fillText(line, x, curY);
+          line = words[n] + ' ';
+          curY += lineHeight;
+        } else {
+          line = testLine;
+        }
+      }
+      ctx.fillText(line, x, curY);
+      curY += lineHeight;
+    });
+  };
+
+  // Helper to draw a single stroke in world space onto any target context
+  const drawSingleStrokeToCtx = useCallback((targetCtx, stroke) => {
+    if (!targetCtx || !stroke) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    targetCtx.save();
+    targetCtx.setTransform(zoom * dpr, 0, 0, zoom * dpr, panOffset.x * dpr, panOffset.y * dpr);
+    targetCtx.lineCap = 'round';
+    targetCtx.lineJoin = 'round';
+
+    const strokeColor = stroke.color || '#000000';
+    const strokeWidth = stroke.width || 5;
+
+    if (stroke.tool === 'eraser') {
+      targetCtx.globalCompositeOperation = 'destination-out';
+      targetCtx.lineWidth = strokeWidth * 2.5;
+    } else {
+      targetCtx.globalCompositeOperation = 'source-over';
+      targetCtx.strokeStyle = strokeColor;
+      targetCtx.fillStyle = strokeColor;
+      targetCtx.lineWidth = strokeWidth;
+    }
+
+    const path = stroke.path || [];
+
+    if (stroke.tool === 'sticky') {
+      if (path.length > 0) {
+        const x = path[0].x;
+        const y = path[0].y;
+        const w = stroke.cardWidth || 180;
+        const lines = (stroke.text || '').split('\n');
+        const computedH = Math.max(140, 40 + lines.length * 20);
+        const h = stroke.cardHeight || computedH;
+
+        // Shadow & Card Fill
+        targetCtx.save();
+        targetCtx.shadowColor = 'rgba(0, 0, 0, 0.15)';
+        targetCtx.shadowBlur = 12;
+        targetCtx.shadowOffsetY = 4;
+        targetCtx.fillStyle = strokeColor || '#fef08a'; // Pastel Yellow
+        targetCtx.beginPath();
+        targetCtx.roundRect(x, y, w, h, 12);
+        targetCtx.fill();
+        targetCtx.restore();
+
+        // Top subtle tape accent
+        targetCtx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        targetCtx.fillRect(x + w / 2 - 20, y - 4, 40, 10);
+
+        // Body Text
+        targetCtx.fillStyle = '#1e293b';
+        targetCtx.font = '14px Inter, sans-serif';
+        wrapText(targetCtx, stroke.text || 'Sticky Note', x + 12, y + 26, w - 24, 18);
+      }
+    } else if (stroke.tool === 'code') {
+      if (path.length > 0) {
+        const x = path[0].x;
+        const y = path[0].y;
+        const w = stroke.cardWidth || 260;
+        const lines = (stroke.text || '').split('\n');
+        const computedH = Math.max(160, 44 + lines.length * 18);
+        const h = stroke.cardHeight || computedH;
+
+        // Card Container
+        targetCtx.save();
+        targetCtx.shadowColor = 'rgba(0, 0, 0, 0.25)';
+        targetCtx.shadowBlur = 14;
+        targetCtx.fillStyle = '#0f172a'; // Dark Slate
+        targetCtx.beginPath();
+        targetCtx.roundRect(x, y, w, h, 10);
+        targetCtx.fill();
+        targetCtx.restore();
+
+        // Header Bar with Dots
+        targetCtx.fillStyle = '#1e293b';
+        targetCtx.beginPath();
+        targetCtx.roundRect(x, y, w, 28, [10, 10, 0, 0]);
+        targetCtx.fill();
+
+        // Dots: Red, Yellow, Green
+        targetCtx.fillStyle = '#ef4444';
+        targetCtx.beginPath();
+        targetCtx.arc(x + 12, y + 14, 4, 0, 2 * Math.PI);
+        targetCtx.fill();
+
+        targetCtx.fillStyle = '#f59e0b';
+        targetCtx.beginPath();
+        targetCtx.arc(x + 24, y + 14, 4, 0, 2 * Math.PI);
+        targetCtx.fill();
+
+        targetCtx.fillStyle = '#10b981';
+        targetCtx.beginPath();
+        targetCtx.arc(x + 36, y + 14, 4, 0, 2 * Math.PI);
+        targetCtx.fill();
+
+        // Language Label
+        targetCtx.fillStyle = '#94a3b8';
+        targetCtx.font = '10px monospace';
+        targetCtx.fillText(stroke.lang || 'JAVASCRIPT', x + w - 75, y + 18);
+
+        // Code Lines
+        targetCtx.fillStyle = '#38bdf8'; // Light Cyan Code
+        targetCtx.font = '12px monospace';
+        lines.forEach((lineStr, lIdx) => {
+          targetCtx.fillText(lineStr, x + 14, y + 46 + lIdx * 18);
+        });
+      }
+    } else if (stroke.tool === 'text') {
+      if (path.length > 0 && stroke.text) {
+        targetCtx.font = `${strokeWidth * 3 || 18}px Inter, sans-serif`;
+        targetCtx.fillText(stroke.text, path[0].x, path[0].y);
+      }
+    } else if (stroke.tool === 'rectangle') {
+      if (path.length >= 2) {
+        const start = path[0];
+        const end = path[path.length - 1];
+        targetCtx.strokeRect(start.x, start.y, end.x - start.x, end.y - start.y);
+      }
+    } else if (stroke.tool === 'circle') {
+      if (path.length >= 2) {
+        const start = path[0];
+        const end = path[path.length - 1];
+        const rx = (end.x - start.x) / 2;
+        const ry = (end.y - start.y) / 2;
+        const cx = start.x + rx;
+        const cy = start.y + ry;
+        targetCtx.beginPath();
+        targetCtx.ellipse(cx, cy, Math.abs(rx), Math.abs(ry), 0, 0, 2 * Math.PI);
+        targetCtx.stroke();
+      }
+    } else if (stroke.tool === 'line') {
+      if (path.length >= 2) {
+        const start = path[0];
+        const end = path[path.length - 1];
+        targetCtx.beginPath();
+        targetCtx.moveTo(start.x, start.y);
+        targetCtx.lineTo(end.x, end.y);
+        targetCtx.stroke();
+      }
+    } else if (stroke.tool === 'arrow') {
+      if (path.length >= 2) {
+        const start = path[0];
+        const end = path[path.length - 1];
+        targetCtx.beginPath();
+        targetCtx.moveTo(start.x, start.y);
+        targetCtx.lineTo(end.x, end.y);
+        targetCtx.stroke();
+        drawArrowHead(targetCtx, start.x, start.y, end.x, end.y, Math.max(12, strokeWidth * 2.5));
+      }
+    } else {
+      // Freehand pen or eraser
+      if (path.length > 0) {
+        targetCtx.beginPath();
+        const [first, ...rest] = path;
+        targetCtx.moveTo(first.x, first.y);
+        rest.forEach(pt => targetCtx.lineTo(pt.x, pt.y));
+        targetCtx.stroke();
+      }
+    }
+
+    targetCtx.restore();
+  }, [zoom, panOffset]);
+
+  // Redraw all strokes with Zoom, Pan, Offscreen Layering, Selection Bounding Box, and Background Theme applied
+  const redrawAll = useCallback((strokeList, extraStroke = null) => {
+    const mainCanvas = canvasRef.current;
+    const mainCtx = ctxRef.current;
+    if (!mainCanvas || !mainCtx) return;
+
+    const rect = mainCanvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+
+    // 1. Draw Background Pattern on Main Canvas
+    drawBackgroundPattern(mainCtx, rect.width, rect.height, zoom, panOffset, bgTheme);
+
+    // 2. Prepare Offscreen Canvas Layer
+    const offscreen = offscreenCanvasRef.current || document.createElement('canvas');
+    if (offscreen.width !== mainCanvas.width || offscreen.height !== mainCanvas.height) {
+      offscreen.width = mainCanvas.width;
+      offscreen.height = mainCanvas.height;
+    }
+    const offCtx = offscreen.getContext('2d');
+    offCtx.setTransform(1, 0, 0, 1, 0, 0);
+    offCtx.clearRect(0, 0, offscreen.width, offscreen.height);
+
+    // 3. Render all strokes onto Offscreen Canvas
+    (strokeList || []).forEach(stroke => {
+      drawSingleStrokeToCtx(offCtx, stroke);
+    });
+
+    // 4. Render active in-progress stroke if dragging
+    if (extraStroke) {
+      drawSingleStrokeToCtx(offCtx, extraStroke);
+    }
+
+    // 5. Overlay Offscreen Canvas onto Main Canvas
+    mainCtx.setTransform(1, 0, 0, 1, 0, 0);
+    mainCtx.drawImage(offscreen, 0, 0);
+
+    // 6. Render Selection Bounding Box if a stroke is selected
+    if (selectedStrokeId) {
+      const selected = (strokeList || []).find(s => s.id === selectedStrokeId);
+      if (selected) {
+        const box = getStrokeBoundingBox(selected);
+        if (box) {
+          mainCtx.save();
+          mainCtx.setTransform(zoom * dpr, 0, 0, zoom * dpr, panOffset.x * dpr, panOffset.y * dpr);
+          mainCtx.strokeStyle = '#3b82f6';
+          mainCtx.lineWidth = 1.5;
+          mainCtx.setLineDash([5, 5]);
+          mainCtx.strokeRect(box.x, box.y, box.width, box.height);
+
+          // Draw corner handles
+          mainCtx.fillStyle = '#ffffff';
+          mainCtx.strokeStyle = '#2563eb';
+          mainCtx.lineWidth = 1.5;
+          mainCtx.setLineDash([]);
+
+          const handles = [
+            { x: box.x, y: box.y },
+            { x: box.x + box.width, y: box.y },
+            { x: box.x, y: box.y + box.height },
+            { x: box.x + box.width, y: box.y + box.height },
+          ];
+
+          handles.forEach(h => {
+            mainCtx.beginPath();
+            mainCtx.arc(h.x, h.y, 4, 0, 2 * Math.PI);
+            mainCtx.fill();
+            mainCtx.stroke();
+          });
+
+          mainCtx.restore();
+        }
+      }
+    }
+
+    // 7. Render Marquee Drag Selection Box if active
+    if (selectionBox) {
+      mainCtx.save();
+      mainCtx.setTransform(zoom * dpr, 0, 0, zoom * dpr, panOffset.x * dpr, panOffset.y * dpr);
+      mainCtx.strokeStyle = '#3b82f6';
+      mainCtx.fillStyle = 'rgba(59, 130, 246, 0.1)';
+      mainCtx.lineWidth = 1;
+      mainCtx.setLineDash([4, 4]);
+
+      const x = Math.min(selectionBox.startX, selectionBox.currentX);
+      const y = Math.min(selectionBox.startY, selectionBox.currentY);
+      const w = Math.abs(selectionBox.currentX - selectionBox.startX);
+      const h = Math.abs(selectionBox.currentY - selectionBox.startY);
+
+      mainCtx.fillRect(x, y, w, h);
+      mainCtx.strokeRect(x, y, w, h);
+      mainCtx.restore();
+    }
+
+    // 8. Draw active laser points in world space on Main Canvas
+    const now = Date.now();
+    const LASER_LIFETIME = 800; // ms
+    laserTrailRef.current = laserTrailRef.current.filter(pt => now - pt.timestamp < LASER_LIFETIME);
+
+    if (laserTrailRef.current.length > 1) {
+      mainCtx.save();
+      mainCtx.setTransform(zoom * dpr, 0, 0, zoom * dpr, panOffset.x * dpr, panOffset.y * dpr);
+      for (let i = 1; i < laserTrailRef.current.length; i++) {
+        const prev = laserTrailRef.current[i - 1];
+        const curr = laserTrailRef.current[i];
+        const age = now - curr.timestamp;
+        const alpha = Math.max(0, 1 - age / LASER_LIFETIME);
+
+        mainCtx.strokeStyle = curr.color || '#ef4444';
+        mainCtx.lineWidth = 6 * alpha;
+        mainCtx.globalAlpha = alpha;
+        mainCtx.shadowColor = curr.color || '#ef4444';
+        mainCtx.shadowBlur = 10;
+
+        mainCtx.beginPath();
+        mainCtx.moveTo(prev.x, prev.y);
+        mainCtx.lineTo(curr.x, curr.y);
+        mainCtx.stroke();
+      }
+      mainCtx.restore();
+    }
+  }, [drawSingleStrokeToCtx, getStrokeBoundingBox, selectedStrokeId, selectionBox, zoom, panOffset, bgTheme]);
+
+  // Keyboard shortcut listener for Delete/Backspace key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedStrokeId) {
+        if (onDeleteStroke) onDeleteStroke(selectedStrokeId);
+        setSelectedStrokeId(null);
+      }
+      if (e.code === 'Space') {
+        setIsSpacePressed(true);
+      }
+    };
+
+    const handleKeyUp = (e) => {
+      if (e.code === 'Space') {
+        setIsSpacePressed(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [selectedStrokeId, onDeleteStroke]);
+
+  // Handle Wheel Zooming
+  const handleWheel = (e) => {
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+    const newZoom = Math.min(Math.max(zoom * zoomFactor, 0.1), 5.0);
+
+    const newPanX = mouseX - (mouseX - panOffset.x) * (newZoom / zoom);
+    const newPanY = mouseY - (mouseY - panOffset.y) * (newZoom / zoom);
+
+    setZoom(newZoom);
+    setPanOffset({ x: newPanX, y: newPanY });
+  };
+
+  // Handle incoming remote laser event
+  useEffect(() => {
+    if (!remoteLaserEvents) return;
+    const { point, color: laserColor } = remoteLaserEvents;
+    if (point) {
+      laserTrailRef.current.push({ ...point, timestamp: Date.now(), color: laserColor || '#ef4444' });
+    }
+  }, [remoteLaserEvents]);
+
+  // Continuous animation loop for laser trail decay
+  useEffect(() => {
+    const animate = () => {
+      if (laserTrailRef.current.length > 0) {
+        redrawAll(strokes);
+      }
+      animFrameRef.current = requestAnimationFrame(animate);
+    };
+    animFrameRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    };
+  }, [redrawAll, strokes]);
+
+  // Expose methods via ref
+  useImperativeHandle(ref, () => ({
+    getCanvas: () => canvasRef.current,
+    redraw: () => redrawAll(strokes),
+    drawStroke: (stroke) => redrawAll(strokes, stroke),
+    resetView: () => {
+      setZoom(1);
+      setPanOffset({ x: 0, y: 0 });
+    },
+    setPan: (newPan) => setPanOffset(newPan),
+  }));
+
+  // Setup & resize listener
+  useEffect(() => {
+    setupCanvasContext();
+    redrawAll(strokes);
+
+    const handleResize = () => {
+      setupCanvasContext();
+      redrawAll(strokes);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [setupCanvasContext, redrawAll, strokes]);
+
+  const onDoubleClick = (e) => {
+    const pt = getCanvasPoint(e);
+    const clickedStroke = [...(strokes || [])].reverse().find(s => {
+      const box = getStrokeBoundingBox(s);
+      return box && pt.x >= box.x && pt.x <= box.x + box.width && pt.y >= box.y && pt.y <= box.y + box.height;
+    });
+
+    if (clickedStroke && (clickedStroke.tool === 'sticky' || clickedStroke.tool === 'code' || clickedStroke.tool === 'text')) {
+      const startPt = clickedStroke.path[0] || pt;
+      setCardInput({
+        type: clickedStroke.tool,
+        x: startPt.x,
+        y: startPt.y,
+        value: clickedStroke.text || '',
+        editingStrokeId: clickedStroke.id,
+      });
+    }
+  };
+
+  const onPointerDown = (e) => {
+    // Pan trigger (middle-click or Spacebar + Left Click)
+    if (e.button === 1 || isSpacePressed) {
+      e.preventDefault();
+      isPanningRef.current = true;
+      startPanRef.current = { x: e.clientX - panOffset.x, y: e.clientY - panOffset.y };
+      return;
+    }
+
+    const ctx = ctxRef.current;
+    if (!ctx) return;
+
+    e.preventDefault();
+    const pt = getCanvasPoint(e);
+
+    // Select Tool handling
+    if (tool === 'select') {
+      // Check if clicking inside an already selected stroke bounding box to move it
+      if (selectedStrokeId) {
+        const selected = (strokes || []).find(s => s.id === selectedStrokeId);
+        const box = getStrokeBoundingBox(selected);
+        if (box && pt.x >= box.x && pt.x <= box.x + box.width && pt.y >= box.y && pt.y <= box.y + box.height) {
+          isDraggingSelectedRef.current = true;
+          dragStartWorldRef.current = pt;
+          return;
+        }
+      }
+
+      // Check if clicking any stroke
+      const clickedStroke = [...(strokes || [])].reverse().find(s => {
+        const box = getStrokeBoundingBox(s);
+        return box && pt.x >= box.x && pt.x <= box.x + box.width && pt.y >= box.y && pt.y <= box.y + box.height;
+      });
+
+      if (clickedStroke) {
+        setSelectedStrokeId(clickedStroke.id);
+        isDraggingSelectedRef.current = true;
+        dragStartWorldRef.current = pt;
+      } else {
+        setSelectedStrokeId(null);
+        setSelectionBox({ startX: pt.x, startY: pt.y, currentX: pt.x, currentY: pt.y });
+      }
+      return;
+    }
+
+    if (tool === 'sticky') {
+      setCardInput({ type: 'sticky', x: pt.x, y: pt.y, value: 'Sticky Note' });
+      return;
+    }
+
+    if (tool === 'code') {
+      setCardInput({ type: 'code', x: pt.x, y: pt.y, value: '// Write code here\nfunction hello() {\n  return "world";\n}' });
+      return;
+    }
+
+    if (tool === 'text') {
+      setCardInput({ type: 'text', x: pt.x, y: pt.y, value: '' });
+      return;
+    }
+
+    if (tool === 'laser') {
+      laserTrailRef.current.push({ ...pt, timestamp: Date.now(), color });
+      if (onLaserMove) onLaserMove(pt.x, pt.y, color);
+      return;
+    }
+
+    isDrawingRef.current = true;
+    currentPathRef.current = [pt];
+  };
+
+  const onPointerMove = (e) => {
+    if (isPanningRef.current) {
+      setPanOffset({
+        x: e.clientX - startPanRef.current.x,
+        y: e.clientY - startPanRef.current.y,
+      });
+      return;
+    }
+
+    const pt = getCanvasPoint(e);
+    if (onCursorMove) onCursorMove(pt.x, pt.y);
+
+    // Select Tool Move Handling
+    if (tool === 'select') {
+      if (isDraggingSelectedRef.current && selectedStrokeId) {
+        const deltaX = pt.x - dragStartWorldRef.current.x;
+        const deltaY = pt.y - dragStartWorldRef.current.y;
+        dragStartWorldRef.current = pt;
+
+        const targetStroke = (strokes || []).find(s => s.id === selectedStrokeId);
+        if (targetStroke && targetStroke.path) {
+          const updatedPath = targetStroke.path.map(p => ({ x: p.x + deltaX, y: p.y + deltaY }));
+          const updatedStroke = { ...targetStroke, path: updatedPath };
+          if (onUpdateStroke) onUpdateStroke(updatedStroke);
+        }
+        return;
+      }
+
+      if (selectionBox) {
+        setSelectionBox(prev => prev ? { ...prev, currentX: pt.x, currentY: pt.y } : null);
+        return;
+      }
+    }
+
+    if (tool === 'laser' && e.buttons === 1) {
+      laserTrailRef.current.push({ ...pt, timestamp: Date.now(), color });
+      if (onLaserMove) onLaserMove(pt.x, pt.y, color);
+      return;
+    }
+
+    if (!isDrawingRef.current || !ctxRef.current) return;
+
+    currentPathRef.current.push(pt);
+
+    // Redraw offscreen strokes layer with live in-progress stroke and overlay onto grid pattern
+    redrawAll(strokes, {
+      tool,
+      color,
+      width,
+      path: currentPathRef.current,
+    });
+  };
+
+  const onPointerUp = () => {
+    if (isPanningRef.current) {
+      isPanningRef.current = false;
+      return;
+    }
+
+    if (tool === 'select') {
+      isDraggingSelectedRef.current = false;
+      if (selectionBox) {
+        // Select any stroke enclosed in selection box
+        const x1 = Math.min(selectionBox.startX, selectionBox.currentX);
+        const y1 = Math.min(selectionBox.startY, selectionBox.currentY);
+        const x2 = Math.max(selectionBox.startX, selectionBox.currentX);
+        const y2 = Math.max(selectionBox.startY, selectionBox.currentY);
+
+        const found = (strokes || []).find(s => {
+          const box = getStrokeBoundingBox(s);
+          return box && box.x >= x1 && box.y >= y1 && (box.x + box.width) <= x2 && (box.y + box.height) <= y2;
+        });
+
+        if (found) {
+          setSelectedStrokeId(found.id);
+        }
+        setSelectionBox(null);
+      }
+      return;
+    }
+
+    if (tool === 'laser' || !isDrawingRef.current) return;
+    isDrawingRef.current = false;
+
+    const path = currentPathRef.current;
+    if (path && path.length > 0 && onFinishStroke) {
+      onFinishStroke({
+        tool,
+        color,
+        width,
+        path,
+      });
+    }
+    currentPathRef.current = [];
+  };
+
+  const handleCommitCard = () => {
+    if (!cardInput || !cardInput.value.trim()) {
+      setCardInput(null);
+      return;
+    }
+
+    const lines = cardInput.value.trim().split('\n');
+
+    if (cardInput.editingStrokeId) {
+      const existingStroke = (strokes || []).find(s => s.id === cardInput.editingStrokeId);
+      if (existingStroke && onUpdateStroke) {
+        const computedH = cardInput.type === 'code' ? Math.max(160, 44 + lines.length * 18) : Math.max(140, 40 + lines.length * 20);
+        const updatedStroke = {
+          ...existingStroke,
+          text: cardInput.value.trim(),
+          color: cardInput.type === 'sticky' ? (color === '#000000' ? existingStroke.color : color) : existingStroke.color,
+          cardHeight: computedH,
+        };
+        onUpdateStroke(updatedStroke);
+      }
+    } else {
+      const computedH = cardInput.type === 'code' ? Math.max(160, 44 + lines.length * 18) : Math.max(140, 40 + lines.length * 20);
+      const newStroke = {
+        id: `stroke_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        tool: cardInput.type,
+        color: cardInput.type === 'sticky' ? (color === '#000000' ? '#fef08a' : color) : color,
+        width,
+        text: cardInput.value.trim(),
+        path: [{ x: cardInput.x, y: cardInput.y }],
+        cardWidth: cardInput.type === 'code' ? 260 : 180,
+        cardHeight: computedH,
+      };
+
+      if (onFinishStroke) {
+        onFinishStroke(newStroke);
+      }
+    }
+
+    setCardInput(null);
+    if (onSelectTool) {
+      onSelectTool('select');
+    }
+  };
+
+  // Convert card input world position to screen position
+  const cardScreenX = cardInput ? cardInput.x * zoom + panOffset.x : 0;
+  const cardScreenY = cardInput ? cardInput.y * zoom + panOffset.y : 0;
+
+  return (
+    <div
+      className={`relative w-full h-full overflow-hidden select-none ${
+        isSpacePressed ? 'cursor-grab active:cursor-grabbing' : ''
+      }`}
+    >
+      <canvas
+        ref={canvasRef}
+        className="block w-full h-full cursor-crosshair touch-none select-none"
+        onWheel={handleWheel}
+        onDoubleClick={onDoubleClick}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerLeave={onPointerUp}
+      />
+
+      {/* Viewport Control Widget (Bottom-Left) */}
+      <div className="absolute bottom-4 left-4 z-40 flex items-center space-x-1.5 bg-white/85 backdrop-blur-xl border border-slate-200/80 px-3 py-2 rounded-2xl shadow-xl shadow-slate-200/50">
+        <button
+          onClick={() => setZoom(z => Math.max(0.1, z - 0.1))}
+          title="Zoom Out"
+          className="w-7 h-7 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-bold flex items-center justify-center text-sm transition-colors"
+        >
+          -
+        </button>
+        <button
+          onClick={() => {
+            setZoom(1);
+            setPanOffset({ x: 0, y: 0 });
+          }}
+          title="Reset View (100%)"
+          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-mono font-bold rounded-lg transition-colors"
+        >
+          {Math.round(zoom * 100)}%
+        </button>
+        <button
+          onClick={() => setZoom(z => Math.min(5.0, z + 0.1))}
+          title="Zoom In"
+          className="w-7 h-7 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-bold flex items-center justify-center text-sm transition-colors"
+        >
+          +
+        </button>
+      </div>
+
+      {/* Inline Text / Sticky / Code Card Overlay Input */}
+      {cardInput && (
+        <div
+          className="absolute z-40 transform -translate-y-1/2 flex flex-col space-y-1.5"
+          style={{ left: `${cardScreenX}px`, top: `${cardScreenY}px` }}
+        >
+          {cardInput.type === 'code' ? (
+            <div className="flex flex-col space-y-1.5 bg-slate-900 border-2 border-sky-400 p-2.5 rounded-xl shadow-2xl">
+              <textarea
+                autoFocus
+                rows={5}
+                cols={30}
+                value={cardInput.value}
+                onChange={e => setCardInput({ ...cardInput, value: e.target.value })}
+                onKeyDown={e => {
+                  if (e.key === 'Escape') setCardInput(null);
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    handleCommitCard();
+                  }
+                }}
+                placeholder="Write code here..."
+                className="p-2 bg-slate-950 text-sky-300 font-mono text-xs outline-none rounded-lg resize-none w-64 border border-slate-800"
+              />
+              <div className="flex justify-end space-x-1.5 pt-0.5">
+                <button
+                  onClick={() => setCardInput(null)}
+                  className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-semibold rounded-md transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCommitCard}
+                  className="px-3 py-1 bg-sky-500 hover:bg-sky-600 text-slate-950 text-[10px] font-bold rounded-md shadow transition-colors"
+                >
+                  {cardInput.editingStrokeId ? 'Update Code ✓' : 'Attach Code ✓'}
+                </button>
+              </div>
+            </div>
+          ) : cardInput.type === 'sticky' ? (
+            <div
+              className="flex flex-col space-y-1.5 p-2.5 border-2 border-amber-400 rounded-xl shadow-2xl"
+              style={{ backgroundColor: color === '#000000' ? '#fef08a' : color }}
+            >
+              <textarea
+                autoFocus
+                rows={4}
+                cols={22}
+                value={cardInput.value}
+                onChange={e => setCardInput({ ...cardInput, value: e.target.value })}
+                onKeyDown={e => {
+                  if (e.key === 'Escape') setCardInput(null);
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleCommitCard();
+                  }
+                }}
+                placeholder="Sticky note text..."
+                className="p-2 bg-white/60 text-slate-800 font-sans text-xs outline-none rounded-lg resize-none w-44 border border-black/10"
+              />
+              <div className="flex justify-end space-x-1.5 pt-0.5">
+                <button
+                  onClick={() => setCardInput(null)}
+                  className="px-2 py-1 bg-black/10 hover:bg-black/20 text-slate-700 text-[10px] font-semibold rounded-md transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCommitCard}
+                  className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold rounded-md shadow transition-colors"
+                >
+                  {cardInput.editingStrokeId ? 'Update Note ✓' : 'Attach Note ✓'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <input
+              autoFocus
+              type="text"
+              value={cardInput.value}
+              onChange={e => setCardInput({ ...cardInput, value: e.target.value })}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleCommitCard();
+                if (e.key === 'Escape') setCardInput(null);
+              }}
+              onBlur={handleCommitCard}
+              placeholder="Type text here..."
+              className="px-2 py-1 bg-white/95 border-2 border-blue-500 rounded-lg shadow-xl outline-none font-sans text-slate-800"
+              style={{ color, fontSize: `${(width * 3 || 18) * zoom}px` }}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Remote Cursors Overlay */}
+      <div className="absolute inset-0 pointer-events-none z-30 overflow-hidden">
+        {Object.entries(cursors).map(([id, { x, y, name, lastSeen }]) => {
+          if (Date.now() - (lastSeen || 0) > 4000) return null;
+          const screenX = x * zoom + panOffset.x;
+          const screenY = y * zoom + panOffset.y;
+          return (
+            <div
+              key={id}
+              className="absolute transition-all duration-75 ease-out"
+              style={{ left: `${screenX}px`, top: `${screenY}px`, transform: 'translate(-50%, -100%)' }}
+            >
+              <div className="flex items-center space-x-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[11px] font-semibold px-2 py-0.5 rounded-full shadow-lg">
+                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
+                <span>{name}</span>
+              </div>
+              <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-blue-600 mx-auto" />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+});
+
+export default WhiteboardCanvas;

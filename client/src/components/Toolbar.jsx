@@ -1,0 +1,246 @@
+import React from 'react';
+
+const PRESET_COLORS = [
+  '#000000', // Black
+  '#ffffff', // White
+  '#ef4444', // Red
+  '#3b82f6', // Blue
+  '#10b981', // Green
+  '#f59e0b', // Yellow
+  '#8b5cf6', // Purple
+  '#ec4899', // Pink
+];
+
+const STICKY_COLORS = [
+  '#fef08a', // Yellow
+  '#fbcfe8', // Pink
+  '#bae6fd', // Cyan
+  '#bbf7d0', // Green
+  '#e9d5ff', // Purple
+];
+
+const TOOLS = [
+  { id: 'select', label: 'Select', key: 'S', icon: 'M15 15l-2 5l-3-3l-3 3l-2-5M3 3l7 18l3-7l7-3L3 3z' },
+  { id: 'pen', label: 'Pen', key: 'P', icon: 'M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z' },
+  { id: 'eraser', label: 'Eraser', key: 'E', icon: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16' },
+  { id: 'sticky', label: 'Sticky', key: 'N', icon: 'M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z' },
+  { id: 'code', label: 'Code', key: 'K', icon: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4' },
+  { id: 'rectangle', label: 'Rect', key: 'R', icon: 'M3 3h18v18H3V3z' },
+  { id: 'circle', label: 'Circle', key: 'C', icon: 'M12 21a9 9 0 100-18 9 9 0 000 18z' },
+  { id: 'line', label: 'Line', key: 'L', icon: 'M4 20L20 4' },
+  { id: 'arrow', label: 'Arrow', key: 'A', icon: 'M14 5l7 7m0 0l-7 7m7-7H3' },
+  { id: 'text', label: 'Text', key: 'T', icon: 'M4 6h16M12 6v14' },
+  { id: 'laser', label: 'Laser', key: 'V', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
+];
+
+const BG_THEMES = [
+  { id: 'grid-lines', label: 'Grid' },
+  { id: 'dot-grid', label: 'Dots' },
+  { id: 'blank', label: 'Blank' },
+  { id: 'dark-mode', label: 'Dark' },
+];
+
+export default function Toolbar({
+  tool,
+  setTool,
+  color,
+  setColor,
+  width,
+  setWidth,
+  bgTheme,
+  setBgTheme,
+  onUndo,
+  onClear,
+  onExport,
+  onTogglePresentation,
+}) {
+  const activeColors = tool === 'sticky' ? STICKY_COLORS : PRESET_COLORS;
+
+  return (
+    <div className="absolute top-4 right-4 z-40 flex flex-col space-y-3 bg-white/85 backdrop-blur-xl border border-slate-200/80 p-3 rounded-2xl shadow-xl shadow-slate-200/50 w-72 transition-all">
+      {/* Tool Selector Grid */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            Tools
+          </span>
+          <span className="text-[10px] text-slate-400 italic">Hotkeys in ()</span>
+        </div>
+        <div className="grid grid-cols-4 gap-1.5 bg-slate-100/80 p-1.5 rounded-xl">
+          {TOOLS.map(t => (
+            <button
+              key={t.id}
+              onClick={() => {
+                setTool(t.id);
+                if (t.id === 'sticky' && !STICKY_COLORS.includes(color)) {
+                  setColor('#fef08a');
+                }
+              }}
+              title={`${t.label} (Press ${t.key})`}
+              className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-lg transition-all ${
+                tool === t.id
+                  ? 'bg-white text-blue-600 shadow-sm scale-105 font-bold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50 font-medium'
+              }`}
+            >
+              <svg className="w-4 h-4 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d={t.icon} />
+              </svg>
+              <div className="flex items-center space-x-0.5 text-[10px]">
+                <span>{t.label}</span>
+                <span className="opacity-60 text-[9px]">({t.key})</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Background Theme Selector */}
+      <div className="space-y-1.5">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          Canvas Theme
+        </span>
+        <div className="grid grid-cols-4 gap-1 bg-slate-100/80 p-1 rounded-xl">
+          {BG_THEMES.map(b => (
+            <button
+              key={b.id}
+              onClick={() => setBgTheme(b.id)}
+              className={`py-1 text-[11px] font-semibold rounded-lg transition-all ${
+                bgTheme === b.id
+                  ? 'bg-white text-blue-600 shadow-sm font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {b.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Color Palette */}
+      {tool !== 'eraser' && tool !== 'code' && (
+        <div className="space-y-2">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            {tool === 'sticky' ? 'Sticky Color' : 'Color Palette'}
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-1.5">
+              {activeColors.map(c => (
+                <button
+                  key={c}
+                  onClick={() => setColor(c)}
+                  className={`w-6 h-6 rounded-full transition-transform ${
+                    c === '#ffffff' ? 'border border-slate-300' : ''
+                  } ${
+                    color === c ? 'scale-125 ring-2 ring-blue-500 ring-offset-1' : 'hover:scale-110'
+                  }`}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
+
+            {tool !== 'sticky' && (
+              <div className="relative">
+                <input
+                  type="color"
+                  value={color}
+                  onChange={e => setColor(e.target.value)}
+                  className="w-7 h-7 rounded-lg cursor-pointer border-0 opacity-0 absolute inset-0"
+                />
+                <div
+                  className="w-7 h-7 rounded-lg border border-slate-200 shadow-inner flex items-center justify-center pointer-events-none"
+                  style={{ backgroundColor: color }}
+                >
+                  <svg className="w-3.5 h-3.5 text-white mix-blend-difference" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Stroke Width / Font Slider */}
+      {tool !== 'sticky' && tool !== 'code' && (
+        <div className="space-y-1.5">
+          <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <span>{tool === 'text' ? 'Font Size' : 'Stroke Size'}</span>
+            <span className="text-slate-600 font-mono text-xs">{width}px</span>
+          </div>
+          <div className="flex items-center space-x-3">
+            <input
+              type="range"
+              min={tool === 'text' ? '12' : '1'}
+              max={tool === 'text' ? '72' : '50'}
+              value={width}
+              onChange={e => setWidth(parseInt(e.target.value, 10))}
+              className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+            />
+            <div
+              className="rounded-full bg-slate-800 flex-shrink-0 transition-all"
+              style={{
+                width: `${Math.min(width, 24)}px`,
+                height: `${Math.min(width, 24)}px`,
+                backgroundColor: tool === 'eraser' ? '#94a3b8' : color,
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="h-px bg-slate-200/80 my-1" />
+
+      {/* Actions */}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={onUndo}
+          title="Undo (Ctrl+Z)"
+          className="flex items-center justify-center space-x-1 px-3 py-2 bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-semibold rounded-xl transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+          </svg>
+          <span>Undo</span>
+          <span className="text-[9px] text-slate-400 font-mono">(Ctrl+Z)</span>
+        </button>
+
+        <button
+          onClick={onClear}
+          className="flex items-center justify-center space-x-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold rounded-xl transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          <span>Clear All</span>
+        </button>
+      </div>
+
+      {/* Export Options & Presentation */}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={() => onExport('png')}
+          className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-xl transition-colors text-center"
+        >
+          Export PNG
+        </button>
+        <button
+          onClick={() => onExport('json')}
+          className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-xl transition-colors text-center"
+        >
+          Export JSON
+        </button>
+      </div>
+
+      <button
+        onClick={onTogglePresentation}
+        className="w-full py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-semibold rounded-xl transition-all shadow-md shadow-purple-500/20 flex items-center justify-center space-x-1.5"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        </svg>
+        <span>Present Mode (F)</span>
+      </button>
+    </div>
+  );
+}
