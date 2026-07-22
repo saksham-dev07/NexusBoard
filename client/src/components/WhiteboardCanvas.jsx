@@ -17,6 +17,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     onLaserMove,
     remoteLaserEvents,
     onSelectTool,
+    onImageUpload,
     onViewportChange,
   },
   ref
@@ -33,6 +34,8 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   const [selectedStrokeId, setSelectedStrokeId] = useState(null);
   const [selectionBox, setSelectionBox] = useState(null); // { startX, startY, currentX, currentY }
   const isDraggingSelectedRef = useRef(false);
+  const isResizingRef = useRef(false);
+  const resizeHandleRef = useRef(null); // 'br', 'bl', 'tr', 'tl'
   const dragStartWorldRef = useRef({ x: 0, y: 0 });
 
   // Offscreen layer canvas ref to allow true destination-out erasing without destroying background grid
@@ -101,7 +104,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
 
     if (stroke.tool === 'image') {
       const start = path[0] || { x: 0, y: 0 };
-      return { x: start.x, y: start.y, width: stroke.imgWidth || 200, height: stroke.imgHeight || 150 };
+      return { x: start.x, y: start.y, width: stroke.imgWidth || 240, height: stroke.imgHeight || 180 };
     }
 
     if (stroke.tool === 'stamp') {
@@ -285,8 +288,8 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
       if (path.length > 0 && stroke.src) {
         const x = path[0].x;
         const y = path[0].y;
-        const w = stroke.imgWidth || 200;
-        const h = stroke.imgHeight || 150;
+        const w = stroke.imgWidth || 240;
+        const h = stroke.imgHeight || 180;
 
         let img = imgCacheRef.current[stroke.src];
         if (!img) {
@@ -302,7 +305,12 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
         }
 
         if (img.complete && img.naturalWidth !== 0) {
+          targetCtx.save();
+          targetCtx.shadowColor = 'rgba(0, 0, 0, 0.15)';
+          targetCtx.shadowBlur = 10;
+          targetCtx.shadowOffsetY = 4;
           targetCtx.drawImage(img, x, y, w, h);
+          targetCtx.restore();
         } else {
           targetCtx.strokeStyle = '#cbd5e1';
           targetCtx.strokeRect(x, y, w, h);
@@ -696,15 +704,15 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
           mainCtx.setLineDash([]);
 
           const handles = [
-            { x: box.x, y: box.y },
-            { x: box.x + box.width, y: box.y },
-            { x: box.x, y: box.y + box.height },
-            { x: box.x + box.width, y: box.y + box.height },
+            { id: 'tl', x: box.x, y: box.y },
+            { id: 'tr', x: box.x + box.width, y: box.y },
+            { id: 'bl', x: box.x, y: box.y + box.height },
+            { id: 'br', x: box.x + box.width, y: box.y + box.height },
           ];
 
           handles.forEach(h => {
             mainCtx.beginPath();
-            mainCtx.arc(h.x, h.y, 4, 0, 2 * Math.PI);
+            mainCtx.arc(h.x, h.y, 5, 0, 2 * Math.PI);
             mainCtx.fill();
             mainCtx.stroke();
           });
@@ -809,6 +817,28 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     setPanOffset({ x: newPanX, y: newPanY });
   };
 
+  // Handle Drag & Drop of Image Files directly onto Canvas
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        const dropPt = getCanvasPoint(e);
+        reader.onload = (event) => {
+          if (onImageUpload) onImageUpload(event.target.result, dropPt);
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+  };
+
   // Handle incoming remote laser event
   useEffect(() => {
     if (!remoteLaserEvents) return;
@@ -894,14 +924,38 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
 
     // Select Tool handling
     if (tool === 'select') {
-      // Check if clicking inside an already selected stroke bounding box to move it
       if (selectedStrokeId) {
         const selected = (strokes || []).find(s => s.id === selectedStrokeId);
         const box = getStrokeBoundingBox(selected);
-        if (box && pt.x >= box.x && pt.x <= box.x + box.width && pt.y >= box.y && pt.y <= box.y + box.height) {
-          isDraggingSelectedRef.current = true;
-          dragStartWorldRef.current = pt;
-          return;
+        if (box) {
+          // Check corner handle clicks for resizing
+          const handleRadius = 8;
+          const handles = [
+            { id: 'tl', x: box.x, y: box.y },
+            { id: 'tr', x: box.x + box.width, y: box.y },
+            { id: 'bl', x: box.x, y: box.y + box.height },
+            { id: 'br', x: box.x + box.width, y: box.y + box.height },
+          ];
+
+          const clickedHandle = handles.find(h => {
+            const dx = pt.x - h.x;
+            const dy = pt.y - h.y;
+            return Math.sqrt(dx * dx + dy * dy) <= handleRadius;
+          });
+
+          if (clickedHandle) {
+            isResizingRef.current = true;
+            resizeHandleRef.current = clickedHandle.id;
+            dragStartWorldRef.current = pt;
+            return;
+          }
+
+          // Check if clicking inside bounding box to move
+          if (pt.x >= box.x && pt.x <= box.x + box.width && pt.y >= box.y && pt.y <= box.y + box.height) {
+            isDraggingSelectedRef.current = true;
+            dragStartWorldRef.current = pt;
+            return;
+          }
         }
       }
 
@@ -974,6 +1028,35 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
 
     // Select Tool Move Handling
     if (tool === 'select') {
+      // Handle Corner Handle Resizing for image and cards
+      if (isResizingRef.current && selectedStrokeId) {
+        const deltaX = pt.x - dragStartWorldRef.current.x;
+        const deltaY = pt.y - dragStartWorldRef.current.y;
+        dragStartWorldRef.current = pt;
+
+        const targetStroke = (strokes || []).find(s => s.id === selectedStrokeId);
+        if (targetStroke) {
+          if (targetStroke.tool === 'image') {
+            const currentW = targetStroke.imgWidth || 240;
+            const currentH = targetStroke.imgHeight || 180;
+            const newW = Math.max(60, currentW + deltaX);
+            const newH = Math.max(45, currentH + deltaY);
+            if (onUpdateStroke) {
+              onUpdateStroke({ ...targetStroke, imgWidth: newW, imgHeight: newH });
+            }
+          } else if (targetStroke.tool === 'sticky' || targetStroke.tool === 'code') {
+            const currentW = targetStroke.cardWidth || (targetStroke.tool === 'code' ? 260 : 180);
+            const currentH = targetStroke.cardHeight || 140;
+            const newW = Math.max(120, currentW + deltaX);
+            const newH = Math.max(100, currentH + deltaY);
+            if (onUpdateStroke) {
+              onUpdateStroke({ ...targetStroke, cardWidth: newW, cardHeight: newH });
+            }
+          }
+        }
+        return;
+      }
+
       if (isDraggingSelectedRef.current && selectedStrokeId) {
         const deltaX = pt.x - dragStartWorldRef.current.x;
         const deltaY = pt.y - dragStartWorldRef.current.y;
@@ -1022,6 +1105,8 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
 
     if (tool === 'select') {
       isDraggingSelectedRef.current = false;
+      isResizingRef.current = false;
+      resizeHandleRef.current = null;
       if (selectionBox) {
         // Select any stroke enclosed in selection box
         const x1 = Math.min(selectionBox.startX, selectionBox.currentX);
@@ -1111,6 +1196,8 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
       className={`relative w-full h-full overflow-hidden select-none ${
         isSpacePressed ? 'cursor-grab active:cursor-grabbing' : ''
       }`}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     >
       <canvas
         ref={canvasRef}

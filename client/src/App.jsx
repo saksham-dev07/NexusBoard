@@ -25,7 +25,7 @@ export default function App() {
   const [remoteLaser, setRemoteLaser] = useState(null);
   const canvasRef = useRef(null);
 
-  // Viewport Zoom & Pan state passed from Canvas for Minimap
+  // Viewport Zoom & Pan state passed from Canvas for Minimap & Spawning
   const [viewportZoom, setViewportZoom] = useState(1);
   const [viewportPan, setViewportPan] = useState({ x: 0, y: 0 });
 
@@ -105,20 +105,40 @@ export default function App() {
     emitDraw(fullStroke);
   };
 
-  const handleImageUpload = (base64Data) => {
+  const handleImageUpload = (base64Data, customWorldPt = null) => {
     if (!base64Data) return;
-    const newStroke = {
-      id: `stroke_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      tool: 'image',
-      src: base64Data,
-      path: [{ x: 100, y: 100 }],
-      imgWidth: 260,
-      imgHeight: 180,
-      roomId,
-      timestamp: Date.now(),
+
+    const img = new Image();
+    img.src = base64Data;
+    img.onload = () => {
+      const maxW = 320;
+      let targetW = Math.min(maxW, img.naturalWidth || maxW);
+      let targetH = img.naturalHeight && img.naturalWidth ? targetW * (img.naturalHeight / img.naturalWidth) : 200;
+
+      // Spawning location: Custom drop point or active Viewport Screen Center
+      let spawnPt = customWorldPt;
+      if (!spawnPt) {
+        const viewW = window.innerWidth;
+        const viewH = window.innerHeight;
+        spawnPt = {
+          x: (viewW / 2 - viewportPan.x) / viewportZoom - targetW / 2,
+          y: (viewH / 2 - viewportPan.y) / viewportZoom - targetH / 2,
+        };
+      }
+
+      const newStroke = {
+        id: `stroke_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        tool: 'image',
+        src: base64Data,
+        path: [spawnPt],
+        imgWidth: Math.round(targetW),
+        imgHeight: Math.round(targetH),
+        roomId,
+        timestamp: Date.now(),
+      };
+      emitDraw(newStroke);
+      setTool('select');
     };
-    emitDraw(newStroke);
-    setTool('select');
   };
 
   const handleImportJSON = (e) => {
@@ -303,6 +323,7 @@ export default function App() {
         onLaserMove={emitLaser}
         remoteLaserEvents={remoteLaser}
         onSelectTool={setTool}
+        onImageUpload={handleImageUpload}
         onViewportChange={({ zoom: z, panOffset: p }) => {
           setViewportZoom(z);
           setViewportPan(p);
