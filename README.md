@@ -33,13 +33,18 @@
 
 ## 🌟 Features Overview
 
-### 🎨 1. Vector Drawing & Annotation Tools
-- **↖️ Select Tool (`S`)**: Single-object & marquee box selection, bounding box corner handles, real-time object dragging, and `Delete`/`Backspace` key removal.
-- **✏️ Pen Tool (`P`)**: Smooth vector drawing with custom color swatches and stroke thickness slider (1px to 50px).
+### 🎨 1. Vector Drawing & Categorized Tool Suite
+- **🗂️ Single-Row Horizontal Scroll Categories**: Compact 4-category tool palette with horizontal scrollbars (`General & Select`, `Cards & Notes`, `Flowchart Suite`, `Shapes & Lines`).
+- **↖️ Select Tool (`S`)**: Single-object & marquee box selection, bounding box corner handle resizing, real-time object dragging, and `Delete`/`Backspace` key removal.
+- **✏️ Pen Tool (`P`)**: Smooth vector drawing with custom color swatches and stroke thickness control (1px to 50px).
+- **🎨 Line Style Selector**: Toggle between Solid (`──`), Dashed (`╌`), and Dotted (`┈`) stroke patterns across shapes and lines.
 - **🧹 Grid-Preserving Eraser (`E`)**: Erases vector drawings using offscreen double-buffering without destroying the background grid pattern.
 - **📌 Digital Sticky Notes (`N`)**: 5 pastel color presets (Yellow, Pink, Cyan, Green, Purple) with double-click inline text editing.
 - **💻 Code Snippet Cards (`K`)**: Dark slate code cards (`#0f172a`) with macOS window controls, language labels, and monospaced code editing.
-- **📐 Geometric Shapes**: Rectangles (`R`), Circles/Ellipses (`C`), Lines (`L`), Directional Arrows (`A`), and Text (`T`).
+- **🖼️ Image Upload & Drag-and-Drop**: Viewport-center spawning, natural aspect ratio calculation, drag & drop image ingestion, and corner handle resizing.
+- **😍 Emoji Stamps Palette (`X`)**: Quick visual feedback stamps (`🚀`, `💡`, `✅`, `❌`, `🔥`, `⚠️`, `⭐`, `🎯`).
+- **📊 Flowchart Suite**: Decision Rhombus (`D`), Process Box (`B`), Database Cylinder (`H`), Terminal Pill (`M`), and Cloud Node (`U`).
+- **📐 Shapes & Lines**: Rectangles (`R`), Circles (`C`), Triangles (`I`), Stars (`J`), Lines (`L`), Arrows (`A`), and Text (`T`).
 - **🪄 Laser Pointer (`V`)**: Glowing transient presentation trail that decays smoothly across connected room users.
 
 ### 🌐 2. Infinite Viewport & Navigation
@@ -52,6 +57,7 @@
 - **Room Isolation**: Unique 8-character Room IDs supporting instant join/create flows.
 - **Live Remote Cursors**: Animated mouse cursor indicators with user name badges.
 - **Expandable Room Chat**: Collapsible chat sidebar with system join/leave notifications.
+- **Import & Export Board State**: Export as high-resolution PNG or JSON, and re-import JSON files to restore boards.
 - **Fullscreen Presentation Mode (`F`)**: Distraction-free presentation view with floating indicator pill.
 
 ---
@@ -77,7 +83,7 @@
   ┌─────────────────────────────────────────────────────────────┐
   │                   Socket.IO Room Gateway                    │
   │  4. Real-time synchronization across multi-user sessions    │
-  └─────────────────────────────────────────────────────────────┘
+  └──────────────────────────────┴──────────────────────────────┘
 ```
 
 ---
@@ -129,13 +135,21 @@ Open your browser and navigate to **`http://localhost:3001`**.
 
 ## ⌨️ Keyboard & Mouse Shortcuts
 
-| Shortcut | Action | Description |
+| Shortcut | Tool / Action | Description |
 | :---: | :--- | :--- |
-| <kbd>S</kbd> | **Select Tool** | Click or drag marquee box to select objects |
+| <kbd>S</kbd> | **Select Tool** | Click or drag marquee box to select & resize objects |
 | <kbd>P</kbd> | **Pen Tool** | Freehand vector drawing |
 | <kbd>E</kbd> | **Eraser Tool** | Grid-preserving stroke eraser |
 | <kbd>N</kbd> | **Sticky Note** | Place colorful digital sticky note |
 | <kbd>K</kbd> | **Code Snippet** | Add syntax-highlighted code card |
+| <kbd>X</kbd> | **Emoji Stamp** | Stamp emojis (`🚀`, `💡`, `✅`, `❌`, `🔥`, `⚠️`, `⭐`, `🎯`) |
+| <kbd>D</kbd> | **Decision Node** | Draw flowchart decision rhombus |
+| <kbd>B</kbd> | **Process Box** | Draw flowchart process box |
+| <kbd>H</kbd> | **Database** | Draw database cylinder shape |
+| <kbd>M</kbd> | **Terminal Pill** | Draw start/end terminal node |
+| <kbd>U</kbd> | **Cloud Node** | Draw cloud service / API node |
+| <kbd>J</kbd> | **Star Badge** | Draw priority star badge shape |
+| <kbd>I</kbd> | **Triangle Node** | Draw delta / pyramid triangle |
 | <kbd>R</kbd> | **Rectangle** | Draw rectangles & boxes |
 | <kbd>C</kbd> | **Circle** | Draw circles & ellipses |
 | <kbd>L</kbd> | **Line** | Draw straight lines |
@@ -143,7 +157,7 @@ Open your browser and navigate to **`http://localhost:3001`**.
 | <kbd>T</kbd> | **Text Tool** | Click canvas to type text |
 | <kbd>V</kbd> | **Laser Pointer** | Transient glowing presentation trail |
 | <kbd>F</kbd> | **Presentation** | Toggle clean fullscreen presentation mode |
-| <kbd>Delete</kbd> / <kbd>Backspace</kbd> | **Delete Object** | Remove selected stroke/card |
+| <kbd>Delete</kbd> / <kbd>Backspace</kbd> | **Delete Object** | Remove selected stroke/card/image |
 | <kbd>Space</kbd> + Drag | **Pan Canvas** | Drag across infinite canvas |
 | Mouse Wheel | **Zoom** | Zoom centered around cursor tip |
 | <kbd>Ctrl</kbd> + <kbd>Z</kbd> | **Undo** | Undo last stroke |
@@ -157,7 +171,7 @@ Open your browser and navigate to **`http://localhost:3001`**.
 | :--- | :---: | :--- |
 | `join-room` | Client ➔ Server | `{ roomId, userName }` |
 | `room-state` | Server ➔ Client | `{ strokes: [], users: [] }` |
-| `draw` | Bi-directional | `{ id, tool, color, width, path, text, ... }` |
+| `draw` | Bi-directional | `{ id, tool, color, width, path, text, src, stamp, ... }` |
 | `update-stroke` | Bi-directional | `{ roomId, updatedStroke }` |
 | `delete-stroke` | Bi-directional | `{ roomId, strokeId }` |
 | `clear` | Bi-directional | `{ roomId }` |
@@ -177,7 +191,7 @@ collaborative-whiteboard/
 │   └── src/
 │       ├── components/         # React UI Components
 │       │   ├── WhiteboardCanvas.jsx   # 2D Canvas Engine & Interaction Matrix
-│       │   ├── Toolbar.jsx            # Tool Palette & Canvas Themes
+│       │   ├── Toolbar.jsx            # Single-Row Categorized Tool Palette
 │       │   ├── Header.jsx             # Room Info & Action Bar
 │       │   ├── Minimap.jsx            # Interactive Viewport Radar
 │       │   ├── ChatSidebar.jsx        # Expandable Room Chat Drawer
