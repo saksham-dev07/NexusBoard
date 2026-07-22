@@ -1,7 +1,7 @@
 {
-  "name": "collaborative-whiteboard",
+  "name": "nexusboard",
   "version": "1.0.0",
-  "description": "Real-time collaborative infinite whiteboard built with React, HTML5 Canvas API, Tailwind CSS, and Socket.IO.",
+  "description": "NexusBoard - Real-time collaborative infinite canvas built with React, HTML5 Canvas API, Tailwind CSS, and Socket.IO.",
   "main": "server/index.js",
   "scripts": {
     "install:all": "npm install --prefix client && npm install --prefix server",
@@ -11,6 +11,7 @@
     "start": "node server/index.js"
   },
   "keywords": [
+    "nexusboard",
     "whiteboard",
     "real-time",
     "socket.io",
@@ -18,6 +19,7 @@
     "canvas",
     "collaboration",
     "sticky-notes",
+    "flowcharts",
     "infinite-canvas"
   ],
   "author": "",

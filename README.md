@@ -1,4 +1,4 @@
-# 🎨 Real-Time Collaborative Infinite Whiteboard
+# 🎨 NexusBoard — Real-Time Collaborative Infinite Canvas
 
 <div align="center">
 
@@ -11,7 +11,7 @@
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 
 <p align="center">
-  <b>A high-performance, multi-user real-time collaborative infinite canvas built with React, HTML5 Canvas 2D API, Tailwind CSS, Node.js, and Socket.IO.</b>
+  <b>NexusBoard is a high-performance, multi-user real-time collaborative infinite canvas built with React, HTML5 Canvas 2D API, Tailwind CSS, Node.js, and Socket.IO.</b>
 </p>
 
 </div>
@@ -109,8 +109,8 @@
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/your-username/collaborative-whiteboard.git
-cd collaborative-whiteboard
+git clone https://github.com/your-username/nexusboard.git
+cd nexusboard
 ```
 
 ### 2. Install All Dependencies
@@ -185,7 +185,7 @@ Open your browser and navigate to **`http://localhost:3001`**.
 ## 📁 Directory Structure
 
 ```text
-collaborative-whiteboard/
+nexusboard/
 ├── client/                     # Frontend React Application
 │   ├── public/                 # HTML Index & Static Assets
 │   └── src/
@@ -214,6 +214,6 @@ collaborative-whiteboard/
 
 ## 🤝 Contributing & License
 
-Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/your-username/collaborative-whiteboard/issues).
+Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/your-username/nexusboard/issues).
 
 Distributed under the **MIT License**. See `LICENSE` for more information.
