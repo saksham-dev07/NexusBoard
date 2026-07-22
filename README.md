@@ -1,48 +1,105 @@
 # 🎨 Real-Time Collaborative Infinite Whiteboard
 
-> A modern, high-performance, real-time collaborative infinite whiteboard web application built with **React**, **HTML5 Canvas API**, **Tailwind CSS**, **Node.js**, and **Socket.IO**.
+<div align="center">
+
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![React](https://img.shields.io/badge/React-18.x-61DAFB?logo=react&logoColor=black)
+![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.x-38BDF8?logo=tailwindcss&logoColor=white)
+![Socket.IO](https://img.shields.io/badge/Socket.IO-4.x-010101?logo=socketdotio&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-18.x-339933?logo=nodedotjs&logoColor=white)
+![Express](https://img.shields.io/badge/Express.js-4.x-000000?logo=express&logoColor=white)
+![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
+
+<p align="center">
+  <b>A high-performance, multi-user real-time collaborative infinite canvas built with React, HTML5 Canvas 2D API, Tailwind CSS, Node.js, and Socket.IO.</b>
+</p>
+
+</div>
 
 ---
 
-## ✨ Features & Capabilities
+## 📌 Table of Contents
 
-### 🎨 Vector Drawing & Annotation Tools
-- **11 Drawing Tools**:
-  - ↖️ **Select Tool (`S`)**: Single-object & marquee selection box, bounding box corner handles, real-time drag moving, and `Delete`/`Backspace` key removal.
-  - ✏️ **Pen Tool (`P`)**: Smooth freehand vector drawing with custom color swatches and stroke thickness control.
-  - 🧹 **Grid-Preserving Eraser (`E`)**: Erases vector strokes cleanly using offscreen double-buffering without destroying the background grid pattern.
-  - 📌 **Digital Sticky Notes (`N`)**: 5 pastel color presets (Yellow, Pink, Cyan, Green, Purple) with double-click inline text editing.
-  - 💻 **Code Snippet Cards (`K`)**: Dark slate code cards (`#0f172a`) with macOS window controls, language labels, and monospaced code editing.
-  - 📐 **Geometric Shapes**: Rectangles (`R`), Circles/Ellipses (`C`), Lines (`L`), Directional Arrows (`A`), and Text Tool (`T`).
-  - 🪄 **Laser Pointer (`V`)**: Glowing transient presentation trail that decays smoothly in real-time across connected users.
-
-### 🌐 Infinite Canvas Viewport & Navigation
-- **Cursor-Anchored Zooming**: Mouse wheel zoom from `10%` to `500%` centered precisely around mouse pointer tip.
-- **Infinite Pan**: `Spacebar + Mouse Drag` or `Middle-Click Drag` to navigate unlimited canvas space.
-- **Interactive Minimap Radar**: Floating bottom-left radar widget rendering miniature stroke previews and translucent live camera viewport box. Click or drag on the minimap to instantly jump camera position.
-- **4 Background Canvas Themes**: `Grid` lines, `Dot-Grid`, `Blank` white, and `Dark Slate` (`#0f172a`).
-
-### ⚡ Real-Time Collaboration & Room Management
-- **Socket.IO Room Sync**: Real-time multi-user drawing, object movement, text updates, room clearing, and undo stack.
-- **Live User Cursor Badges**: Shows real-time remote mouse cursor positions with animated user name badges.
-- **Room Chat Drawer**: Sleek expandable chat sidebar with system join/leave notifications.
-- **Fullscreen Presentation Mode (`F`)**: Distraction-free presentation mode with top floating indicator pill.
+- [🌟 Features Overview](#-features-overview)
+- [🏗️ System Architecture](#️-system-architecture)
+- [🛠️ Tech Stack](#️-tech-stack)
+- [⚡ Quick Start & Installation](#-quick-start--installation)
+- [⌨️ Keyboard & Mouse Shortcuts](#️-keyboard--mouse-shortcuts)
+- [🔌 Socket.IO Event Reference](#-socketio-event-reference)
+- [📁 Directory Structure](#-directory-structure)
+- [🤝 Contributing & License](#-contributing--license)
 
 ---
 
-## 🛠️ Technology Stack
+## 🌟 Features Overview
 
-- **Frontend**: React 18, Tailwind CSS, HTML5 Canvas 2D Context API, WebSockets (`socket.io-client`).
-- **Backend**: Node.js, Express.js, Socket.IO.
-- **Architecture**: Offscreen double-buffering canvas layer for destination-out erasing, custom matrix transformation pipeline (`setTransform`).
+### 🎨 1. Vector Drawing & Annotation Tools
+- **↖️ Select Tool (`S`)**: Single-object & marquee box selection, bounding box corner handles, real-time object dragging, and `Delete`/`Backspace` key removal.
+- **✏️ Pen Tool (`P`)**: Smooth vector drawing with custom color swatches and stroke thickness slider (1px to 50px).
+- **🧹 Grid-Preserving Eraser (`E`)**: Erases vector drawings using offscreen double-buffering without destroying the background grid pattern.
+- **📌 Digital Sticky Notes (`N`)**: 5 pastel color presets (Yellow, Pink, Cyan, Green, Purple) with double-click inline text editing.
+- **💻 Code Snippet Cards (`K`)**: Dark slate code cards (`#0f172a`) with macOS window controls, language labels, and monospaced code editing.
+- **📐 Geometric Shapes**: Rectangles (`R`), Circles/Ellipses (`C`), Lines (`L`), Directional Arrows (`A`), and Text (`T`).
+- **🪄 Laser Pointer (`V`)**: Glowing transient presentation trail that decays smoothly across connected room users.
+
+### 🌐 2. Infinite Viewport & Navigation
+- **Cursor-Anchored Zoom**: Mouse wheel zoom (`10%` to `500%`) centered precisely around mouse pointer tip.
+- **Infinite Pan**: `Spacebar + Drag` or `Middle-Click Drag` to navigate unlimited canvas space.
+- **Interactive Minimap Radar**: Floating bottom-left radar widget rendering miniature stroke previews and translucent live camera viewport box. Click or drag to jump camera position.
+- **4 Canvas Themes**: `Grid` lines, `Dot-Grid`, `Blank` white, and `Dark Slate` (`#0f172a`).
+
+### ⚡ 3. Real-Time Collaboration & Room System
+- **Room Isolation**: Unique 8-character Room IDs supporting instant join/create flows.
+- **Live Remote Cursors**: Animated mouse cursor indicators with user name badges.
+- **Expandable Room Chat**: Collapsible chat sidebar with system join/leave notifications.
+- **Fullscreen Presentation Mode (`F`)**: Distraction-free presentation view with floating indicator pill.
 
 ---
 
-## 🚀 Quick Start Guide
+## 🏗️ System Architecture
+
+### Offscreen Double-Buffering Layer Pipeline
+
+```
+  ┌─────────────────────────────────────────────────────────────┐
+  │                    Main Screen Canvas                       │
+  │  1. Render Background Pattern (Grid / Dots / Dark Theme)    │
+  └──────────────────────────────┬──────────────────────────────┘
+                                 │
+                                 ▼ Composites
+  ┌─────────────────────────────────────────────────────────────┐
+  │                 Offscreen Canvas Layer                      │
+  │  2. Render Vector Strokes (Pen, Shapes, Sticky Notes)       │
+  │  3. Eraser operates using 'destination-out' (Grid Intact)   │
+  └──────────────────────────────┬──────────────────────────────┘
+                                 │
+                                 ▼ Emits Matrix Strokes
+  ┌─────────────────────────────────────────────────────────────┐
+  │                   Socket.IO Room Gateway                    │
+  │  4. Real-time synchronization across multi-user sessions    │
+  └─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🛠️ Tech Stack
+
+| Domain | Technology / Library | Purpose |
+| :--- | :--- | :--- |
+| **Frontend Framework** | React 18 | Declarative component UI state management |
+| **Styling & Theme** | Tailwind CSS | Modern glassmorphism floating UI layout |
+| **Canvas Engine** | HTML5 2D Context API | World matrix transformations (`setTransform`) & offscreen buffering |
+| **Real-time Gateway** | Socket.IO Client | Real-time WebSocket bidirectional event streaming |
+| **Backend Runtime** | Node.js & Express.js | In-memory room manager & socket dispatcher |
+| **Error Handling** | React Error Boundary | Top-level crash interception & recovery |
+
+---
+
+## ⚡ Quick Start & Installation
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/) (v16.0.0 or higher)
-- [npm](https://www.npmjs.com/) (v8.0.0 or higher)
+- **Node.js**: `v16.0.0` or higher
+- **npm**: `v8.0.0` or higher
 
 ### 1. Clone the Repository
 ```bash
@@ -50,22 +107,19 @@ git clone https://github.com/your-username/collaborative-whiteboard.git
 cd collaborative-whiteboard
 ```
 
-### 2. Install Dependencies
+### 2. Install All Dependencies
 ```bash
-# Install root, client, and server dependencies
 npm run install:all
 ```
 
-### 3. Start Development Servers
-Run backend server and client frontend in separate terminal windows:
+### 3. Launch Development Servers
 
-**Terminal 1 (Backend Server on Port 4000):**
+**Option A — Separate Terminal Windows:**
 ```bash
+# Terminal 1: Backend Server (Port 4000)
 npm run dev:server
-```
 
-**Terminal 2 (Frontend Client on Port 3001):**
-```bash
+# Terminal 2: Frontend Client (Port 3001)
 npm run dev:client
 ```
 
@@ -73,39 +127,79 @@ Open your browser and navigate to **`http://localhost:3001`**.
 
 ---
 
-## ⌨️ Keyboard Shortcuts Reference
+## ⌨️ Keyboard & Mouse Shortcuts
 
-| Key / Hotkey | Action / Feature |
-| :--- | :--- |
-| <kbd>S</kbd> | Activate **Select Tool** (Click or drag marquee box) |
-| <kbd>P</kbd> | Activate **Pen Tool** |
-| <kbd>E</kbd> | Activate **Eraser Tool** |
-| <kbd>N</kbd> | Activate **Sticky Note** (Click canvas to place) |
-| <kbd>K</kbd> | Activate **Code Snippet Card** |
-| <kbd>R</kbd> | Draw **Rectangle** |
-| <kbd>C</kbd> | Draw **Circle / Ellipse** |
-| <kbd>L</kbd> | Draw **Line** |
-| <kbd>A</kbd> | Draw **Directional Arrow** |
-| <kbd>T</kbd> | Add **Text** |
-| <kbd>V</kbd> | Activate **Laser Pointer** |
-| <kbd>F</kbd> | Toggle **Presentation Mode** |
-| <kbd>Delete</kbd> / <kbd>Backspace</kbd> | Delete selected object |
-| <kbd>Space</kbd> + Drag | Pan infinite canvas |
-| Mouse Wheel | Zoom in / Zoom out |
-| <kbd>Ctrl</kbd> + <kbd>Z</kbd> | Undo last action |
-| <kbd>?</kbd> | Open Shortcuts cheat sheet |
-
----
-
-## ⚙️ Architecture Highlight: Offscreen Canvas Layering
-
-To allow vector erasing (`destination-out`) without erasing the underlying grid or dark background:
-1. **Main Canvas Context**: Renders background pattern (`Grid`, `Dots`, `Dark`) in screen space.
-2. **Offscreen Layer**: All strokes (pen lines, sticky notes, code cards, shapes) are drawn onto an in-memory offscreen canvas buffer.
-3. **Erasing**: Eraser uses `globalCompositeOperation = 'destination-out'` exclusively on the offscreen canvas layer.
-4. **Compositing**: The offscreen buffer is composited onto the main canvas using `mainCtx.drawImage(offscreen, 0, 0)`.
+| Shortcut | Action | Description |
+| :---: | :--- | :--- |
+| <kbd>S</kbd> | **Select Tool** | Click or drag marquee box to select objects |
+| <kbd>P</kbd> | **Pen Tool** | Freehand vector drawing |
+| <kbd>E</kbd> | **Eraser Tool** | Grid-preserving stroke eraser |
+| <kbd>N</kbd> | **Sticky Note** | Place colorful digital sticky note |
+| <kbd>K</kbd> | **Code Snippet** | Add syntax-highlighted code card |
+| <kbd>R</kbd> | **Rectangle** | Draw rectangles & boxes |
+| <kbd>C</kbd> | **Circle** | Draw circles & ellipses |
+| <kbd>L</kbd> | **Line** | Draw straight lines |
+| <kbd>A</kbd> | **Arrow** | Draw directional arrows |
+| <kbd>T</kbd> | **Text Tool** | Click canvas to type text |
+| <kbd>V</kbd> | **Laser Pointer** | Transient glowing presentation trail |
+| <kbd>F</kbd> | **Presentation** | Toggle clean fullscreen presentation mode |
+| <kbd>Delete</kbd> / <kbd>Backspace</kbd> | **Delete Object** | Remove selected stroke/card |
+| <kbd>Space</kbd> + Drag | **Pan Canvas** | Drag across infinite canvas |
+| Mouse Wheel | **Zoom** | Zoom centered around cursor tip |
+| <kbd>Ctrl</kbd> + <kbd>Z</kbd> | **Undo** | Undo last stroke |
+| <kbd>?</kbd> | **Shortcuts** | Open hotkeys cheat sheet |
 
 ---
 
-## 📄 License
-This project is licensed under the [MIT License](LICENSE).
+## 🔌 Socket.IO Event Reference
+
+| Event Name | Direction | Payload Description |
+| :--- | :---: | :--- |
+| `join-room` | Client ➔ Server | `{ roomId, userName }` |
+| `room-state` | Server ➔ Client | `{ strokes: [], users: [] }` |
+| `draw` | Bi-directional | `{ id, tool, color, width, path, text, ... }` |
+| `update-stroke` | Bi-directional | `{ roomId, updatedStroke }` |
+| `delete-stroke` | Bi-directional | `{ roomId, strokeId }` |
+| `clear` | Bi-directional | `{ roomId }` |
+| `undo` | Bi-directional | `{ roomId }` |
+| `chat` | Bi-directional | `{ roomId, message, timestamp }` |
+| `cursor` | Bi-directional | `{ roomId, cursor: { x, y } }` |
+| `laser` | Bi-directional | `{ roomId, point: { x, y, color } }` |
+
+---
+
+## 📁 Directory Structure
+
+```text
+collaborative-whiteboard/
+├── client/                     # Frontend React Application
+│   ├── public/                 # HTML Index & Static Assets
+│   └── src/
+│       ├── components/         # React UI Components
+│       │   ├── WhiteboardCanvas.jsx   # 2D Canvas Engine & Interaction Matrix
+│       │   ├── Toolbar.jsx            # Tool Palette & Canvas Themes
+│       │   ├── Header.jsx             # Room Info & Action Bar
+│       │   ├── Minimap.jsx            # Interactive Viewport Radar
+│       │   ├── ChatSidebar.jsx        # Expandable Room Chat Drawer
+│       │   ├── JoinModal.jsx          # Room Join / Create Modal
+│       │   ├── ShortcutsModal.jsx     # Hotkeys Reference Table
+│       │   └── ErrorBoundary.jsx      # React Error Boundary Protection
+│       ├── hooks/
+│       │   └── useWhiteboard.js       # Socket.IO Connection & State Hook
+│       ├── App.jsx             # Main Application Layout
+│       ├── index.js            # React Root Entry Point
+│       └── index.css           # Tailwind Utility System & Glassmorphism
+├── server/                     # Backend Node.js / Express Application
+│   ├── index.js                # Express & Socket.IO Room Server
+│   └── package.json            # Server Dependencies
+├── package.json                # Root Scripts Manager
+└── README.md                   # Project Documentation
+```
+
+---
+
+## 🤝 Contributing & License
+
+Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/your-username/collaborative-whiteboard/issues).
+
+Distributed under the **MIT License**. See `LICENSE` for more information.
