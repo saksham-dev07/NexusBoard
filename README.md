@@ -14,6 +14,8 @@
   <b>NexusBoard is a high-performance, multi-user real-time collaborative infinite canvas built with React, HTML5 Canvas 2D API, Tailwind CSS, Node.js, and Socket.IO.</b>
 </p>
 
+![NexusBoard Preview](./nexusboard-preview.png)
+
 </div>
 
 ---
