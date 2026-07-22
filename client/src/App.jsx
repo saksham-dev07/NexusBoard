@@ -132,7 +132,7 @@ export default function App() {
     }
   };
 
-  // Keyboard Shortcuts (Ctrl+Z, S, P, E, N, K, R, C, L, A, T, V, F, ?)
+  // Keyboard Shortcuts (Ctrl+Z, S, P, E, N, K, D, B, H, M, U, J, I, R, C, L, A, T, V, F, ?)
   useEffect(() => {
     if (!joined) return;
 
@@ -160,6 +160,20 @@ export default function App() {
         setColor('#fef08a');
       } else if (k === 'k') {
         setTool('code');
+      } else if (k === 'd') {
+        setTool('decision');
+      } else if (k === 'b') {
+        setTool('process');
+      } else if (k === 'h') {
+        setTool('database');
+      } else if (k === 'm') {
+        setTool('pill');
+      } else if (k === 'u') {
+        setTool('cloud');
+      } else if (k === 'j') {
+        setTool('star');
+      } else if (k === 'i') {
+        setTool('triangle');
       } else if (k === 'r') {
         setTool('rectangle');
       } else if (k === 'c') {

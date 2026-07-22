@@ -6,6 +6,13 @@ const SHORTCUTS = [
   { key: 'E', label: 'Eraser Tool', desc: 'Erase vector drawings' },
   { key: 'N', label: 'Sticky Note', desc: 'Add colorful digital sticky note' },
   { key: 'K', label: 'Code Snippet', desc: 'Add syntax-highlighted code card' },
+  { key: 'D', label: 'Decision Node', desc: 'Draw flowchart decision rhombus' },
+  { key: 'B', label: 'Process Box', desc: 'Draw flowchart process box' },
+  { key: 'H', label: 'Database', desc: 'Draw database cylinder shape' },
+  { key: 'M', label: 'Terminal Pill', desc: 'Draw start/end terminal node' },
+  { key: 'U', label: 'Cloud Node', desc: 'Draw cloud service / API node' },
+  { key: 'J', label: 'Star Badge', desc: 'Draw priority star badge shape' },
+  { key: 'I', label: 'Triangle Node', desc: 'Draw delta / pyramid triangle' },
   { key: 'R', label: 'Rectangle', desc: 'Draw rectangles & boxes' },
   { key: 'C', label: 'Circle', desc: 'Draw circles & ellipses' },
   { key: 'L', label: 'Line', desc: 'Draw straight lines' },
@@ -30,7 +37,7 @@ export default function ShortcutsModal({ onClose }) {
             </div>
             <div>
               <h2 className="text-lg font-bold text-slate-800">Keyboard & Mouse Shortcuts</h2>
-              <p className="text-xs text-slate-500">Quick controls for pan, zoom, selection, and tools</p>
+              <p className="text-xs text-slate-500">Quick controls for pan, zoom, flowchart, and tools</p>
             </div>
           </div>
           <button

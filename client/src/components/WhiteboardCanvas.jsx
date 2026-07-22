@@ -51,7 +51,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     }
   }, [zoom, panOffset, onViewportChange]);
 
-  // Text / Sticky / Code card inline input state: { type: 'text'|'sticky'|'code', x, y, value, editingStrokeId }
+  // Text / Sticky / Code card inline input state: { type, x, y, value, editingStrokeId }
   const [cardInput, setCardInput] = useState(null);
 
   // Laser points ref: array of { x, y, timestamp, color }
@@ -271,13 +271,13 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
         targetCtx.shadowColor = 'rgba(0, 0, 0, 0.15)';
         targetCtx.shadowBlur = 12;
         targetCtx.shadowOffsetY = 4;
-        targetCtx.fillStyle = strokeColor || '#fef08a'; // Pastel Yellow
+        targetCtx.fillStyle = strokeColor || '#fef08a';
         targetCtx.beginPath();
         targetCtx.roundRect(x, y, w, h, 12);
         targetCtx.fill();
         targetCtx.restore();
 
-        // Top subtle tape accent
+        // Top tape accent
         targetCtx.fillStyle = 'rgba(255, 255, 255, 0.4)';
         targetCtx.fillRect(x + w / 2 - 20, y - 4, 40, 10);
 
@@ -299,19 +299,19 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
         targetCtx.save();
         targetCtx.shadowColor = 'rgba(0, 0, 0, 0.25)';
         targetCtx.shadowBlur = 14;
-        targetCtx.fillStyle = '#0f172a'; // Dark Slate
+        targetCtx.fillStyle = '#0f172a';
         targetCtx.beginPath();
         targetCtx.roundRect(x, y, w, h, 10);
         targetCtx.fill();
         targetCtx.restore();
 
-        // Header Bar with Dots
+        // Header Bar
         targetCtx.fillStyle = '#1e293b';
         targetCtx.beginPath();
         targetCtx.roundRect(x, y, w, 28, [10, 10, 0, 0]);
         targetCtx.fill();
 
-        // Dots: Red, Yellow, Green
+        // Dots
         targetCtx.fillStyle = '#ef4444';
         targetCtx.beginPath();
         targetCtx.arc(x + 12, y + 14, 4, 0, 2 * Math.PI);
@@ -333,11 +333,196 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
         targetCtx.fillText(stroke.lang || 'JAVASCRIPT', x + w - 75, y + 18);
 
         // Code Lines
-        targetCtx.fillStyle = '#38bdf8'; // Light Cyan Code
+        targetCtx.fillStyle = '#38bdf8';
         targetCtx.font = '12px monospace';
         lines.forEach((lineStr, lIdx) => {
           targetCtx.fillText(lineStr, x + 14, y + 46 + lIdx * 18);
         });
+      }
+    } else if (stroke.tool === 'diamond') {
+      if (path.length >= 2) {
+        const start = path[0];
+        const end = path[path.length - 1];
+        const cx = start.x + (end.x - start.x) / 2;
+        const cy = start.y + (end.y - start.y) / 2;
+
+        targetCtx.beginPath();
+        targetCtx.moveTo(cx, start.y);
+        targetCtx.lineTo(end.x, cy);
+        targetCtx.lineTo(cx, end.y);
+        targetCtx.lineTo(start.x, cy);
+        targetCtx.closePath();
+        targetCtx.stroke();
+
+        if (stroke.text) {
+          targetCtx.save();
+          targetCtx.fillStyle = strokeColor;
+          targetCtx.font = '12px Inter, sans-serif';
+          targetCtx.textAlign = 'center';
+          targetCtx.textBaseline = 'middle';
+          targetCtx.fillText(stroke.text, cx, cy);
+          targetCtx.restore();
+        }
+      }
+    } else if (stroke.tool === 'process') {
+      if (path.length >= 2) {
+        const start = path[0];
+        const end = path[path.length - 1];
+        const w = end.x - start.x;
+        const h = end.y - start.y;
+
+        targetCtx.beginPath();
+        targetCtx.roundRect(start.x, start.y, w, h, 8);
+        targetCtx.stroke();
+
+        if (stroke.text) {
+          targetCtx.save();
+          targetCtx.fillStyle = strokeColor;
+          targetCtx.font = '12px Inter, sans-serif';
+          targetCtx.textAlign = 'center';
+          targetCtx.textBaseline = 'middle';
+          targetCtx.fillText(stroke.text, start.x + w / 2, start.y + h / 2);
+          targetCtx.restore();
+        }
+      }
+    } else if (stroke.tool === 'database') {
+      if (path.length >= 2) {
+        const start = path[0];
+        const end = path[path.length - 1];
+        const w = Math.abs(end.x - start.x);
+        const h = Math.abs(end.y - start.y);
+        const rx = w / 2;
+        const ry = Math.min(14, h / 4);
+        const cx = start.x + rx;
+
+        targetCtx.beginPath();
+        targetCtx.ellipse(cx, start.y + ry, rx, ry, 0, 0, 2 * Math.PI);
+        targetCtx.stroke();
+
+        targetCtx.beginPath();
+        targetCtx.moveTo(start.x, start.y + ry);
+        targetCtx.lineTo(start.x, start.y + h - ry);
+        targetCtx.moveTo(start.x + w, start.y + ry);
+        targetCtx.lineTo(start.x + w, start.y + h - ry);
+        targetCtx.stroke();
+
+        targetCtx.beginPath();
+        targetCtx.ellipse(cx, start.y + h - ry, rx, ry, 0, 0, Math.PI);
+        targetCtx.stroke();
+
+        if (stroke.text) {
+          targetCtx.save();
+          targetCtx.fillStyle = strokeColor;
+          targetCtx.font = '12px Inter, sans-serif';
+          targetCtx.textAlign = 'center';
+          targetCtx.textBaseline = 'middle';
+          targetCtx.fillText(stroke.text, cx, start.y + h / 2);
+          targetCtx.restore();
+        }
+      }
+    } else if (stroke.tool === 'pill') {
+      if (path.length >= 2) {
+        const start = path[0];
+        const end = path[path.length - 1];
+        const w = end.x - start.x;
+        const h = end.y - start.y;
+
+        targetCtx.beginPath();
+        targetCtx.roundRect(start.x, start.y, w, h, Math.min(Math.abs(w), Math.abs(h)) / 2);
+        targetCtx.stroke();
+
+        if (stroke.text) {
+          targetCtx.save();
+          targetCtx.fillStyle = strokeColor;
+          targetCtx.font = '12px Inter, sans-serif';
+          targetCtx.textAlign = 'center';
+          targetCtx.textBaseline = 'middle';
+          targetCtx.fillText(stroke.text, start.x + w / 2, start.y + h / 2);
+          targetCtx.restore();
+        }
+      }
+    } else if (stroke.tool === 'star') {
+      if (path.length >= 2) {
+        const start = path[0];
+        const end = path[path.length - 1];
+        const cx = start.x + (end.x - start.x) / 2;
+        const cy = start.y + (end.y - start.y) / 2;
+        const outerR = Math.min(Math.abs(end.x - start.x), Math.abs(end.y - start.y)) / 2;
+        const innerR = outerR / 2.2;
+
+        targetCtx.beginPath();
+        for (let i = 0; i < 10; i++) {
+          const r = i % 2 === 0 ? outerR : innerR;
+          const angle = (i * Math.PI) / 5 - Math.PI / 2;
+          const x = cx + r * Math.cos(angle);
+          const y = cy + r * Math.sin(angle);
+          if (i === 0) targetCtx.moveTo(x, y);
+          else targetCtx.lineTo(x, y);
+        }
+        targetCtx.closePath();
+        targetCtx.stroke();
+
+        if (stroke.text) {
+          targetCtx.save();
+          targetCtx.fillStyle = strokeColor;
+          targetCtx.font = '12px Inter, sans-serif';
+          targetCtx.textAlign = 'center';
+          targetCtx.textBaseline = 'middle';
+          targetCtx.fillText(stroke.text, cx, cy);
+          targetCtx.restore();
+        }
+      }
+    } else if (stroke.tool === 'triangle') {
+      if (path.length >= 2) {
+        const start = path[0];
+        const end = path[path.length - 1];
+        const cx = start.x + (end.x - start.x) / 2;
+
+        targetCtx.beginPath();
+        targetCtx.moveTo(cx, start.y);
+        targetCtx.lineTo(end.x, end.y);
+        targetCtx.lineTo(start.x, end.y);
+        targetCtx.closePath();
+        targetCtx.stroke();
+
+        if (stroke.text) {
+          targetCtx.save();
+          targetCtx.fillStyle = strokeColor;
+          targetCtx.font = '12px Inter, sans-serif';
+          targetCtx.textAlign = 'center';
+          targetCtx.textBaseline = 'middle';
+          targetCtx.fillText(stroke.text, cx, start.y + (end.y - start.y) * 0.65);
+          targetCtx.restore();
+        }
+      }
+    } else if (stroke.tool === 'cloud') {
+      if (path.length >= 2) {
+        const start = path[0];
+        const end = path[path.length - 1];
+        const x = Math.min(start.x, end.x);
+        const y = Math.min(start.y, end.y);
+        const w = Math.abs(end.x - start.x);
+        const h = Math.abs(end.y - start.y);
+
+        targetCtx.beginPath();
+        targetCtx.moveTo(x + w * 0.2, y + h * 0.7);
+        targetCtx.bezierCurveTo(x, y + h * 0.7, x, y + h * 0.3, x + w * 0.2, y + h * 0.3);
+        targetCtx.bezierCurveTo(x + w * 0.1, y, x + w * 0.5, y, x + w * 0.5, y + h * 0.2);
+        targetCtx.bezierCurveTo(x + w * 0.7, y, x + w, y + h * 0.2, x + w * 0.8, y + h * 0.5);
+        targetCtx.bezierCurveTo(x + w, y + h * 0.6, x + w * 0.9, y + h, x + w * 0.7, y + h);
+        targetCtx.bezierCurveTo(x + w * 0.4, y + h * 1.1, x + w * 0.2, y + h, x + w * 0.2, y + h * 0.7);
+        targetCtx.closePath();
+        targetCtx.stroke();
+
+        if (stroke.text) {
+          targetCtx.save();
+          targetCtx.fillStyle = strokeColor;
+          targetCtx.font = '12px Inter, sans-serif';
+          targetCtx.textAlign = 'center';
+          targetCtx.textBaseline = 'middle';
+          targetCtx.fillText(stroke.text, x + w / 2, y + h / 2);
+          targetCtx.restore();
+        }
       }
     } else if (stroke.tool === 'text') {
       if (path.length > 0 && stroke.text) {
@@ -620,7 +805,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
       return box && pt.x >= box.x && pt.x <= box.x + box.width && pt.y >= box.y && pt.y <= box.y + box.height;
     });
 
-    if (clickedStroke && (clickedStroke.tool === 'sticky' || clickedStroke.tool === 'code' || clickedStroke.tool === 'text')) {
+    if (clickedStroke) {
       const startPt = clickedStroke.path[0] || pt;
       setCardInput({
         type: clickedStroke.tool,
