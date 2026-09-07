@@ -1,0 +1,9 @@
+{
+  "short_name": "NexusBoard",
+  "name": "NexusBoard Real-Time Collaborative Canvas",
+  "icons": [],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#0f172a",
+  "background_color": "#f8fafc"
+}
