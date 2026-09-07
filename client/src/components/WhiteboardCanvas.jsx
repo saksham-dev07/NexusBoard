@@ -34,6 +34,7 @@ const TEXT_EDITABLE_TOOLS = new Set([
   'triangle',
   'star',
   'decision',
+  'diamond',
   'process',
   'database',
   'pill',
@@ -70,6 +71,9 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   const redrawAllRef = useRef(null);
   useEffect(() => {
     strokesRef.current = strokes;
+    if (redrawAllRef.current) {
+      redrawAllRef.current(strokes);
+    }
   }, [strokes]);
 
   // In-memory image object cache
@@ -142,16 +146,20 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   const [cardInput, setCardInput] = useState(null);
   const textInputRef = useRef(null);
 
-  // Guarantee instant auto-focus for text typing whenever the text card opens
+  // Guarantee instant auto-focus once when text card opens (does not re-select on typing)
+  const cardInputKey = cardInput ? `${cardInput.type}_${cardInput.editingStrokeId || 'new'}` : null;
   useEffect(() => {
-    if (cardInput && cardInput.type !== 'sticky' && cardInput.type !== 'code') {
+    if (cardInputKey && cardInput && cardInput.type !== 'sticky' && cardInput.type !== 'code') {
       const timer = setTimeout(() => {
-        textInputRef.current?.focus();
-        textInputRef.current?.select();
+        if (textInputRef.current) {
+          textInputRef.current.focus();
+          const len = textInputRef.current.value ? textInputRef.current.value.length : 0;
+          textInputRef.current.setSelectionRange(len, len);
+        }
       }, 25);
       return () => clearTimeout(timer);
     }
-  }, [cardInput]);
+  }, [cardInputKey]);
 
   // Laser points ref: array of { x, y, timestamp, color }
   const laserTrailRef = useRef([]);
@@ -510,7 +518,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
           targetCtx.fillText(lineStr, x + 14, y + 46 + lIdx * 18);
         });
       }
-    } else if (stroke.tool === 'diamond') {
+    } else if (stroke.tool === 'diamond' || stroke.tool === 'decision') {
       if (path.length >= 2) {
         const start = path[0];
         const end = path[path.length - 1];
@@ -896,6 +904,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
       mainCtx.restore();
     }
   }, [drawSingleStrokeToCtx, getStrokeBoundingBox, selectedStrokeId, selectionBox, zoom, panOffset, bgTheme]);
+  redrawAllRef.current = redrawAll;
 
   // Keyboard shortcut listener for Delete/Backspace key
   useEffect(() => {
@@ -1049,7 +1058,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('orientationchange', handleResize);
     };
-  }, [setupCanvasContext, redrawAll, strokes]);
+  }, [setupCanvasContext, redrawAll]);
 
   const onDoubleClick = (e) => {
     // When using freehand drawing tools (pen, laser, eraser), ignore double-clicks so drawing is never interrupted
@@ -1233,15 +1242,15 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     }
 
     if (tool === 'text') {
-      const existingTextStroke = [...(strokes || [])].reverse().find(s => {
-        if (s.tool !== 'text') return false;
+      const existingTextStroke = [...(strokesRef.current || strokes || [])].reverse().find(s => {
+        if (!TEXT_EDITABLE_TOOLS.has(s.tool)) return false;
         const box = getStrokeBoundingBox(s);
         return box && pt.x >= box.x && pt.x <= box.x + box.width && pt.y >= box.y && pt.y <= box.y + box.height;
       });
       if (existingTextStroke) {
         const startPt = existingTextStroke.path[0] || pt;
         setCardInput({
-          type: 'text',
+          type: existingTextStroke.tool,
           x: startPt.x,
           y: startPt.y,
           value: existingTextStroke.text || '',
@@ -1476,10 +1485,11 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     }
 
     const lines = cardInput.value.trim().split('\n');
+    const allStrokes = strokesRef.current || strokes || [];
 
     if (cardInput.editingStrokeId) {
-      const existingStroke = (strokes || []).find(s => s.id === cardInput.editingStrokeId);
-      if (existingStroke && onUpdateStroke) {
+      const existingStroke = allStrokes.find(s => s.id === cardInput.editingStrokeId);
+      if (existingStroke) {
         const computedH = cardInput.type === 'code' ? Math.max(160, 44 + lines.length * 18) : Math.max(140, 40 + lines.length * 20);
         const updatedStroke = {
           ...existingStroke,
@@ -1487,7 +1497,14 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
           color: cardInput.type === 'sticky' ? (color === '#000000' ? existingStroke.color : color) : existingStroke.color,
           cardHeight: computedH,
         };
-        onUpdateStroke(updatedStroke);
+        const nextStrokes = allStrokes.map(s => (s.id === updatedStroke.id ? updatedStroke : s));
+        strokesRef.current = nextStrokes;
+        if (redrawAllRef.current) {
+          redrawAllRef.current(nextStrokes);
+        }
+        if (onUpdateStroke) {
+          onUpdateStroke(updatedStroke);
+        }
       }
     } else {
       const computedH = cardInput.type === 'code' ? Math.max(160, 44 + lines.length * 18) : Math.max(140, 40 + lines.length * 20);
@@ -1502,6 +1519,11 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
         cardHeight: computedH,
       };
 
+      const nextStrokes = [...allStrokes, newStroke];
+      strokesRef.current = nextStrokes;
+      if (redrawAllRef.current) {
+        redrawAllRef.current(nextStrokes);
+      }
       if (onFinishStroke) {
         onFinishStroke(newStroke);
       }
@@ -1601,6 +1623,8 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
           className="absolute z-40 transform -translate-y-1/2 flex flex-col space-y-1.5 max-w-[90vw]"
           style={{ left: `${cardScreenX}px`, top: `${cardScreenY}px` }}
           onPointerDown={e => e.stopPropagation()}
+          onMouseDown={e => e.stopPropagation()}
+          onTouchStart={e => e.stopPropagation()}
         >
           {cardInput.type === 'code' ? (
             <div className="flex flex-col space-y-1.5 bg-slate-900 border-2 border-sky-400 p-2.5 rounded-xl shadow-2xl max-w-[85vw]">
@@ -1686,11 +1710,18 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
                   if (e.key === 'Enter') handleCommitCard();
                   if (e.key === 'Escape') setCardInput(null);
                 }}
+                onPointerDown={e => e.stopPropagation()}
+                onMouseDown={e => e.stopPropagation()}
+                onTouchStart={e => e.stopPropagation()}
                 onClick={e => e.stopPropagation()}
                 placeholder="Type text here..."
                 className="px-2.5 py-1.5 bg-transparent outline-none font-sans text-slate-900 text-sm flex-1 min-w-[160px] font-medium"
               />
               <button
+                type="button"
+                onPointerDown={e => e.stopPropagation()}
+                onMouseDown={e => e.stopPropagation()}
+                onTouchStart={e => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation();
                   handleCommitCard();

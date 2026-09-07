@@ -191,21 +191,26 @@ export function useWhiteboard({
   }, [joined, roomId, userName, setError]);
 
   const emitDraw = useCallback((strokeData) => {
-    if (!socketRef.current) return;
     setStrokes(prev => [...prev, strokeData]);
-    socketRef.current.emit('draw', strokeData);
+    if (socketRef.current) {
+      socketRef.current.emit('draw', strokeData);
+    }
   }, []);
 
   const emitUpdateStroke = useCallback((updatedStroke) => {
-    if (!socketRef.current || !updatedStroke?.id) return;
+    if (!updatedStroke?.id) return;
     setStrokes(prev => prev.map(s => (s.id === updatedStroke.id ? updatedStroke : s)));
-    socketRef.current.emit('update-stroke', { roomId, updatedStroke });
+    if (socketRef.current) {
+      socketRef.current.emit('update-stroke', { roomId, updatedStroke });
+    }
   }, [roomId]);
 
   const emitDeleteStroke = useCallback((strokeId) => {
-    if (!socketRef.current || !strokeId) return;
+    if (!strokeId) return;
     setStrokes(prev => prev.filter(s => s.id !== strokeId));
-    socketRef.current.emit('delete-stroke', { roomId, strokeId });
+    if (socketRef.current) {
+      socketRef.current.emit('delete-stroke', { roomId, strokeId });
+    }
   }, [roomId]);
 
   const emitClear = useCallback(() => {
