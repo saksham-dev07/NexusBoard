@@ -63,15 +63,10 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     panOffsetRef.current = panOffset;
   }, [panOffset]);
 
-  // Dedicated 2-finger touch gesture tracking
-  const touchGestureRef = useRef({
-    isActive: false,
-    initialDist: 0,
-    initialZoom: 1,
-    initialMid: { x: 0, y: 0 },
-    initialPan: { x: 0, y: 0 },
-    lastGestureEndTime: 0,
-  });
+  // Pointer-based multi-touch tracking for 2-finger zoom in / zoom out and pan
+  const activePointersRef = useRef(new Map());
+  const pinchRef = useRef(null);
+  const lastPinchEndTimeRef = useRef(0);
 
   const isPanningRef = useRef(false);
   const startPanRef = useRef({ x: 0, y: 0 });
@@ -83,87 +78,23 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     }
   }, [zoom, panOffset, onViewportChange]);
 
-  // Touch Gestures: 2-finger pinch-to-zoom and 2-finger pan
+  // Prevent browser viewport pinch-zoom on mobile web page
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const getTouchDist = (t1, t2) => {
-      const dx = t1.clientX - t2.clientX;
-      const dy = t1.clientY - t2.clientY;
-      return Math.sqrt(dx * dx + dy * dy);
-    };
-
-    const getTouchMid = (t1, t2) => {
-      const rect = canvas.getBoundingClientRect();
-      return {
-        x: (t1.clientX + t2.clientX) / 2 - rect.left,
-        y: (t1.clientY + t2.clientY) / 2 - rect.top,
-      };
-    };
-
-    const handleTouchStart = (e) => {
-      if (e.touches.length >= 2) {
+    const preventDefaultMultiTouch = (e) => {
+      if (e.touches && e.touches.length >= 2) {
         e.preventDefault();
-        touchGestureRef.current.isActive = true;
-        touchGestureRef.current.initialDist = getTouchDist(e.touches[0], e.touches[1]);
-        touchGestureRef.current.initialZoom = zoomRef.current;
-        touchGestureRef.current.initialMid = getTouchMid(e.touches[0], e.touches[1]);
-        touchGestureRef.current.initialPan = { ...panOffsetRef.current };
-
-        // Abort and wipe any accidental stroke started by the first finger before the 2nd finger touched
-        if (isDrawingRef.current) {
-          isDrawingRef.current = false;
-          currentPathRef.current = [];
-          if (redrawAllRef.current) {
-            redrawAllRef.current(strokesRef.current || []);
-          }
-        }
       }
     };
 
-    const handleTouchMove = (e) => {
-      if (e.touches.length >= 2 && touchGestureRef.current.isActive) {
-        e.preventDefault();
-        const currentDist = getTouchDist(e.touches[0], e.touches[1]);
-        const currentMid = getTouchMid(e.touches[0], e.touches[1]);
-        const { initialDist, initialZoom, initialMid, initialPan } = touchGestureRef.current;
-
-        if (initialDist > 0) {
-          const scale = currentDist / initialDist;
-          const newZoom = Math.min(Math.max(initialZoom * scale, 0.1), 5.0);
-
-          const newPanX = currentMid.x - (initialMid.x - initialPan.x) * (newZoom / initialZoom);
-          const newPanY = currentMid.y - (initialMid.y - initialPan.y) * (newZoom / initialZoom);
-
-          setZoom(newZoom);
-          setPanOffset({ x: newPanX, y: newPanY });
-        }
-      }
-    };
-
-    const handleTouchEnd = (e) => {
-      if (e.touches.length < 2) {
-        if (touchGestureRef.current.isActive) {
-          touchGestureRef.current.lastGestureEndTime = Date.now();
-        }
-        if (e.touches.length === 0) {
-          touchGestureRef.current.isActive = false;
-          touchGestureRef.current.initialDist = 0;
-        }
-      }
-    };
-
-    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
-    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
-    canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
-    canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+    canvas.addEventListener('touchstart', preventDefaultMultiTouch, { passive: false });
+    canvas.addEventListener('touchmove', preventDefaultMultiTouch, { passive: false });
 
     return () => {
-      canvas.removeEventListener('touchstart', handleTouchStart);
-      canvas.removeEventListener('touchmove', handleTouchMove);
-      canvas.removeEventListener('touchend', handleTouchEnd);
-      canvas.removeEventListener('touchcancel', handleTouchEnd);
+      canvas.removeEventListener('touchstart', preventDefaultMultiTouch);
+      canvas.removeEventListener('touchmove', preventDefaultMultiTouch);
     };
   }, []);
 
@@ -911,7 +842,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     };
   }, [selectedStrokeId, onDeleteStroke]);
 
-  // Handle Wheel Zooming
+  // Handle Wheel Zooming & Trackpad Pinch
   const handleWheel = (e) => {
     e.preventDefault();
     const canvas = canvasRef.current;
@@ -920,6 +851,17 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
+
+    // Trackpad pinch gesture sets e.ctrlKey === true
+    if (e.ctrlKey) {
+      const zoomFactor = Math.pow(1.01, -e.deltaY);
+      const newZoom = Math.min(Math.max(zoom * zoomFactor, 0.1), 5.0);
+      const newPanX = mouseX - (mouseX - panOffset.x) * (newZoom / zoom);
+      const newPanY = mouseY - (mouseY - panOffset.y) * (newZoom / zoom);
+      setZoom(newZoom);
+      setPanOffset({ x: newPanX, y: newPanY });
+      return;
+    }
 
     const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
     const newZoom = Math.min(Math.max(zoom * zoomFactor, 0.1), 5.0);
@@ -1047,8 +989,51 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   };
 
   const onPointerDown = (e) => {
-    // If a two-finger pinch/zoom gesture is active or recently ended (cooldown), ignore touch drawing
-    if (touchGestureRef.current.isActive || (Date.now() - touchGestureRef.current.lastGestureEndTime < 350)) {
+    // Record active pointer
+    activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    // Multi-touch detection (2 or more fingers): strictly ZOOM IN / ZOOM OUT & PAN
+    if (activePointersRef.current.size >= 2) {
+      // Abort any in-progress drawing immediately
+      isDrawingRef.current = false;
+      currentPathRef.current = [];
+      isPanningRef.current = false;
+      isDraggingSelectedRef.current = false;
+      isResizingRef.current = false;
+
+      // Release any pointer capture so multi-touch is unhindered
+      if (e?.target?.releasePointerCapture && e?.pointerId) {
+        try {
+          e.target.releasePointerCapture(e.pointerId);
+        } catch (err) {}
+      }
+
+      const pts = Array.from(activePointersRef.current.values());
+      const p1 = pts[0];
+      const p2 = pts[1];
+      const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+      const rect = canvasRef.current ? canvasRef.current.getBoundingClientRect() : { left: 0, top: 0 };
+      const mid = {
+        x: (p1.x + p2.x) / 2 - rect.left,
+        y: (p1.y + p2.y) / 2 - rect.top,
+      };
+
+      pinchRef.current = {
+        initialDist: Math.max(10, dist),
+        initialZoom: zoomRef.current,
+        initialMid: mid,
+        initialPan: { ...panOffsetRef.current },
+      };
+
+      // Wipe out any stray dot or stroke started by the 1st finger before the 2nd touched
+      if (redrawAllRef.current) {
+        redrawAllRef.current(strokesRef.current || []);
+      }
+      return;
+    }
+
+    // Pinch cooldown: ignore new single-touch within 400ms of pinch ending
+    if (Date.now() - lastPinchEndTimeRef.current < 400) {
       return;
     }
 
@@ -1165,8 +1150,47 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   };
 
   const onPointerMove = (e) => {
-    // If two-finger gesture is active or in cooldown, cancel any stroke and ignore
-    if (touchGestureRef.current.isActive || (Date.now() - touchGestureRef.current.lastGestureEndTime < 350)) {
+    if (activePointersRef.current.has(e.pointerId)) {
+      activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    }
+
+    // Two-finger pinch zoom & pan handling
+    if (activePointersRef.current.size >= 2 || pinchRef.current) {
+      if (isDrawingRef.current) {
+        isDrawingRef.current = false;
+        currentPathRef.current = [];
+        if (redrawAllRef.current) {
+          redrawAllRef.current(strokesRef.current || []);
+        }
+      }
+
+      if (activePointersRef.current.size >= 2 && pinchRef.current) {
+        const pts = Array.from(activePointersRef.current.values());
+        const p1 = pts[0];
+        const p2 = pts[1];
+        const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+        const rect = canvasRef.current ? canvasRef.current.getBoundingClientRect() : { left: 0, top: 0 };
+        const mid = {
+          x: (p1.x + p2.x) / 2 - rect.left,
+          y: (p1.y + p2.y) / 2 - rect.top,
+        };
+
+        const { initialDist, initialZoom, initialMid, initialPan } = pinchRef.current;
+        if (initialDist > 0) {
+          const scale = dist / initialDist;
+          const newZoom = Math.min(Math.max(initialZoom * scale, 0.1), 5.0);
+          const newPanX = mid.x - (initialMid.x - initialPan.x) * (newZoom / initialZoom);
+          const newPanY = mid.y - (initialMid.y - initialPan.y) * (newZoom / initialZoom);
+
+          setZoom(newZoom);
+          setPanOffset({ x: newPanX, y: newPanY });
+        }
+      }
+      return;
+    }
+
+    // Pinch cooldown guard: block drawing immediately following a pinch gesture
+    if (Date.now() - lastPinchEndTimeRef.current < 400) {
       if (isDrawingRef.current) {
         isDrawingRef.current = false;
         currentPathRef.current = [];
@@ -1260,14 +1284,22 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   };
 
   const onPointerUp = (e) => {
+    if (e?.pointerId !== undefined) {
+      activePointersRef.current.delete(e.pointerId);
+    }
+
     if (e?.target?.releasePointerCapture && e?.pointerId) {
       try {
         e.target.releasePointerCapture(e.pointerId);
       } catch (err) {}
     }
 
-    // If two-finger gesture is active or in cooldown, cancel any stroke and ignore
-    if (touchGestureRef.current.isActive || (Date.now() - touchGestureRef.current.lastGestureEndTime < 350)) {
+    // If pinch was active, or fingers are still on the screen, or within cooldown: DO NOT COMMIT A STROKE!
+    if (pinchRef.current || activePointersRef.current.size > 0 || (Date.now() - lastPinchEndTimeRef.current < 400)) {
+      if (activePointersRef.current.size === 0) {
+        pinchRef.current = null;
+        lastPinchEndTimeRef.current = Date.now();
+      }
       if (isDrawingRef.current) {
         isDrawingRef.current = false;
         currentPathRef.current = [];
@@ -1389,6 +1421,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
         onPointerLeave={onPointerUp}
       />
 
