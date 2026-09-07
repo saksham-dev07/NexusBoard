@@ -77,7 +77,6 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   const [zoom, setZoom] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isSpacePressed, setIsSpacePressed] = useState(false);
-  const [pointerHoverPos, setPointerHoverPos] = useState(null);
 
   const zoomRef = useRef(zoom);
   const panOffsetRef = useRef(panOffset);
@@ -1265,11 +1264,6 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     const pt = getCanvasPoint(e);
     if (onCursorMove) onCursorMove(pt.x, pt.y);
 
-    if (e.pointerType !== 'touch') {
-      const rect = canvasRef.current ? canvasRef.current.getBoundingClientRect() : { left: 0, top: 0 };
-      setPointerHoverPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-    }
-
     // Select Tool Move Handling
     if (tool === 'select') {
       // Handle Corner Handle Resizing for image and cards
@@ -1495,73 +1489,9 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerCancel={(e) => {
-          onPointerUp(e);
-          setPointerHoverPos(null);
-        }}
-        onPointerLeave={(e) => {
-          onPointerUp(e);
-          setPointerHoverPos(null);
-        }}
+        onPointerCancel={onPointerUp}
+        onPointerLeave={onPointerUp}
       />
-
-      {/* On-Canvas High-Contrast Interactive Visual Cursor Follower */}
-      {pointerHoverPos && !isDrawingRef.current && (
-        <div
-          className="pointer-events-none absolute z-30 transform -translate-x-1/2 -translate-y-1/2 select-none flex items-center transition-opacity duration-75"
-          style={{ left: `${pointerHoverPos.x}px`, top: `${pointerHoverPos.y}px` }}
-        >
-          {tool === 'text' ? (
-            <div className="flex items-center">
-              {/* Dual-tone High-contrast I-Beam SVG */}
-              <svg className="w-6 h-6 drop-shadow-md flex-shrink-0" viewBox="0 0 24 24" fill="none">
-                <line x1="7" y1="2" x2="17" y2="2" stroke="#ffffff" strokeWidth="4.5" strokeLinecap="round" />
-                <line x1="12" y1="2" x2="12" y2="22" stroke="#ffffff" strokeWidth="4.5" strokeLinecap="round" />
-                <line x1="7" y1="22" x2="17" y2="22" stroke="#ffffff" strokeWidth="4.5" strokeLinecap="round" />
-                <line x1="7" y1="2" x2="17" y2="2" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" />
-                <line x1="12" y1="2" x2="12" y2="22" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" />
-                <line x1="7" y1="22" x2="17" y2="22" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-              <div className="ml-2.5 px-2.5 py-1 bg-slate-900/90 backdrop-blur-md text-white text-[11px] font-semibold rounded-full shadow-xl border border-slate-700/80 whitespace-nowrap flex items-center space-x-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-                <span>Click anywhere to type text</span>
-              </div>
-            </div>
-          ) : isSpacePressed || tool === 'pan' ? (
-            <div className="flex items-center">
-              <svg className="w-7 h-7 drop-shadow-md flex-shrink-0" viewBox="0 0 28 28">
-                <path d="M8 4a1.5 1.5 0 0 1 1.5 1.5V10h1V3a1.5 1.5 0 0 1 3 0v7h1V4a1.5 1.5 0 0 1 3 0v6h1V6.5a1.5 1.5 0 0 1 3 0v9.5c0 4.4-3.6 8-8 8s-8-3.6-8-8v-7a1.5 1.5 0 0 1 3 0v4h1V5.5A1.5 1.5 0 0 1 8 4z" fill="#ffffff" stroke="#0f172a" strokeWidth="2" strokeLinejoin="round"/>
-              </svg>
-              <div className="ml-2.5 px-2.5 py-1 bg-slate-900/90 backdrop-blur-md text-white text-[11px] font-semibold rounded-full shadow-xl border border-slate-700/80 whitespace-nowrap flex items-center space-x-1.5">
-                <span>{isPanningRef.current ? 'Panning...' : 'Click & drag to pan'}</span>
-              </div>
-            </div>
-          ) : tool === 'sticky' ? (
-            <div className="flex items-center">
-              <div className="w-5 h-5 rounded bg-amber-300 border-2 border-slate-900 shadow-md flex-shrink-0" />
-              <div className="ml-2.5 px-2.5 py-1 bg-slate-900/90 backdrop-blur-md text-white text-[11px] font-semibold rounded-full shadow-xl border border-slate-700/80 whitespace-nowrap">
-                Click to place sticky note
-              </div>
-            </div>
-          ) : tool === 'code' ? (
-            <div className="flex items-center">
-              <div className="w-5 h-5 rounded bg-slate-950 border border-sky-400 text-sky-300 text-[10px] font-mono flex items-center justify-center shadow-md flex-shrink-0">
-                {'</>'}
-              </div>
-              <div className="ml-2.5 px-2.5 py-1 bg-slate-900/90 backdrop-blur-md text-white text-[11px] font-semibold rounded-full shadow-xl border border-slate-700/80 whitespace-nowrap">
-                Click to place code card
-              </div>
-            </div>
-          ) : tool === 'stamp' ? (
-            <div className="flex items-center">
-              <span className="text-xl drop-shadow-md flex-shrink-0">{selectedStamp}</span>
-              <div className="ml-2.5 px-2.5 py-1 bg-slate-900/90 backdrop-blur-md text-white text-[11px] font-semibold rounded-full shadow-xl border border-slate-700/80 whitespace-nowrap">
-                Click to stamp
-              </div>
-            </div>
-          ) : null}
-        </div>
-      )}
 
       {/* Viewport Control Widget (Bottom-Left) */}
       <div className="absolute bottom-4 left-4 z-40 flex items-center space-x-1.5 bg-white/90 backdrop-blur-xl border border-slate-200/80 px-2.5 py-1.5 rounded-2xl shadow-xl shadow-slate-200/50">
