@@ -1,5 +1,29 @@
 import React, { useRef, useEffect, useCallback, forwardRef, useImperativeHandle, useState } from 'react';
 
+// Rock-solid Base64 cursor data URIs (100% visible on white canvas and dark theme across all browsers)
+const BASE64_CURSORS = {
+  crosshair:
+    "url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIyLjUiIGZpbGw9IiMwZjE3MmEiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiLz48bGluZSB4MT0iMTIiIHkxPSIxIiB4Mj0iMTIiIHkyPSI4IiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjEyIiB5MT0iMTYiIHgyPSIxMiIgeTI9IjIzIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjEiIHkxPSIxMiIgeDI9IjgiIHkyPSIxMiIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIxNiIgeTE9IjEyIiB4Mj0iMjMiIHkyPSIxMiIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIxMiIgeTE9IjEiIHgyPSIxMiIgeTI9IjgiIHN0cm9rZT0iIzBmMTcyYSIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIxMiIgeTE9IjE2IiB4Mj0iMTIiIHkyPSIyMyIgc3Ryb2tlPSIjMGYxNzJhIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjEiIHkxPSIxMiIgeDI9IjgiIHkyPSIxMiIgc3Ryb2tlPSIjMGYxNzJhIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjE2IiB5MT0iMTIiIHgyPSIyMyIgeTI9IjEyIiBzdHJva2U9IiMwZjE3MmEiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48L3N2Zz4=') 12 12, crosshair",
+
+  text:
+    "url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij48bGluZSB4MT0iNyIgeTE9IjIiIHgyPSIxNyIgeTI9IjIiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSI0LjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIxMiIgeTE9IjIiIHgyPSIxMiIgeTI9IjIyIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iNC41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iNyIgeTE9IjIyIiB4Mj0iMTciIHkyPSIyMiIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjQuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjciIHkxPSIyIiB4Mj0iMTciIHkyPSIyIiBzdHJva2U9IiMwZjE3MmEiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjEyIiB5MT0iMiIgeDI9IjEyIiB5Mj0iMjIiIHN0cm9rZT0iIzBmMTcyYSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iNyIgeTE9IjIyIiB4Mj0iMTciIHkyPSIyMiIgc3Ryb2tlPSIjMGYxNzJhIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjwvc3ZnPg==') 12 12, text",
+
+  grab:
+    "url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyOCIgaGVpZ2h0PSIyOCIgdmlld0JveD0iMCAwIDI4IDI4Ij48cGF0aCBkPSJNOCA0YTEuNSAxLjUgMCAwIDEgMS41IDEuNVYxMGgxVjNhMS41IDEuNSAwIDAgMSAzIDB2N2gxVjRhMS41IDEuNSAwIDAgMSAzIDB2NmgxVjYuNWExLjUgMS41IDAgMCAxIDMgMHY5LjVjMCA0LjQtMy42IDgtOCA4cy04LTMuNi04LTh2LTdhMS41IDEuNSAwIDAgMSAzIDB2NGgxVjUuNUExLjUgMS41IDAgMCAxIDggNHoiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIzLjUiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48cGF0aCBkPSJNOCA0YTEuNSAxLjUgMCAwIDEgMS41IDEuNVYxMGgxVjNhMS41IDEuNSAwIDAgMSAzIDB2N2gxVjRhMS41IDEuNSAwIDAgMSAzIDB2NmgxVjYuNWExLjUgMS41IDAgMCAxIDMgMHY5LjVjMCA0LjQtMy42IDgtOCA4cy04LTMuNi04LTh2LTdhMS41IDEuNSAwIDAgMSAzIDB2NGgxVjUuNUExLjUgMS41IDAgMCAxIDggNHoiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iIzBmMTcyYSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+') 14 14, grab",
+
+  grabbing:
+    "url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyOCIgaGVpZ2h0PSIyOCIgdmlld0JveD0iMCAwIDI4IDI4Ij48cGF0aCBkPSJNNyAxMWMwLTIuMiAxLjgtNCA0LTRoNmMyLjIgMCA0IDEuOCA0IDR2NWMwIDQuNC0zLjYgOC04IDhzLTgtMy42LTgtOHYtNXoiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIzLjUiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48cGF0aCBkPSJNNyAxMWMwLTIuMiAxLjgtNCA0LTRoNmMyLjIgMCA0IDEuOCA0IDR2NWMwIDQuNC0zLjYgOC04IDhzLTgtMy42LTgtOHYtNXoiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iIzBmMTcyYSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PGxpbmUgeDE9IjExIiB5MT0iNyIgeDI9IjExIiB5Mj0iMTQiIHN0cm9rZT0iIzBmMTcyYSIgc3Ryb2tlLXdpZHRoPSIxLjgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIxNCIgeTE9IjciIHgyPSIxNCIgeTI9IjE0IiBzdHJva2U9IiMwZjE3MmEiIHN0cm9rZS13aWR0aD0iMS44IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMTciIHkxPSI3IiB4Mj0iMTciIHkyPSIxNCIgc3Ryb2tlPSIjMGYxNzJhIiBzdHJva2Utd2lkdGg9IjEuOCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PC9zdmc+') 14 14, grabbing",
+
+  select:
+    "url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij48cGF0aCBkPSJNMiAybDcgMTkgMy41LTcuNUwyMCAxMCAyIDJ6IiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMy41IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBhdGggZD0iTTIgMmw3IDE5IDMuNS03LjVMMjAgMTAgMiAyeiIgZmlsbD0iI2ZmZmZmZiIgc3Ryb2tlPSIjMGYxNzJhIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4=') 2 2, default",
+
+  eraser:
+    "url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSI4IiBmaWxsPSIjZmVlMmUyIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMyIvPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2VmNDQ0NCIgc3Ryb2tlLXdpZHRoPSIyIi8+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMS41IiBmaWxsPSIjZWY0NDQ0Ii8+PC9zdmc+') 12 12, crosshair",
+
+  laser:
+    "url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSI1IiBmaWxsPSIjZWY0NDQ0IiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMi41Ii8+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMS41IiBmaWxsPSIjZmZmZmZmIi8+PC9zdmc+') 12 12, crosshair",
+};
+
 const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   {
     tool,
@@ -53,6 +77,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   const [zoom, setZoom] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isSpacePressed, setIsSpacePressed] = useState(false);
+  const [pointerHoverPos, setPointerHoverPos] = useState(null);
 
   const zoomRef = useRef(zoom);
   const panOffsetRef = useRef(panOffset);
@@ -149,6 +174,15 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     if (stroke.tool === 'stamp') {
       const start = path[0] || { x: 0, y: 0 };
       return { x: start.x - 24, y: start.y - 24, width: 48, height: 48 };
+    }
+
+    if (stroke.tool === 'text') {
+      const start = path[0] || { x: 0, y: 0 };
+      const fontSize = (stroke.width * 3 || 18);
+      const textLen = (stroke.text || '').length || 1;
+      const approxW = Math.max(32, textLen * (fontSize * 0.62));
+      const approxH = Math.max(22, fontSize * 1.3);
+      return { x: start.x, y: start.y, width: approxW, height: approxH };
     }
 
     if (path.length === 0) return null;
@@ -636,8 +670,11 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
       }
     } else if (stroke.tool === 'text') {
       if (path.length > 0 && stroke.text) {
+        targetCtx.save();
+        targetCtx.textBaseline = 'top';
         targetCtx.font = `${strokeWidth * 3 || 18}px Inter, sans-serif`;
         targetCtx.fillText(stroke.text, path[0].x, path[0].y);
+        targetCtx.restore();
       }
     } else if (stroke.tool === 'rectangle') {
       if (path.length >= 2) {
@@ -1135,6 +1172,22 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     }
 
     if (tool === 'text') {
+      const existingTextStroke = [...(strokes || [])].reverse().find(s => {
+        if (s.tool !== 'text') return false;
+        const box = getStrokeBoundingBox(s);
+        return box && pt.x >= box.x && pt.x <= box.x + box.width && pt.y >= box.y && pt.y <= box.y + box.height;
+      });
+      if (existingTextStroke) {
+        const startPt = existingTextStroke.path[0] || pt;
+        setCardInput({
+          type: 'text',
+          x: startPt.x,
+          y: startPt.y,
+          value: existingTextStroke.text || '',
+          editingStrokeId: existingTextStroke.id,
+        });
+        return;
+      }
       setCardInput({ type: 'text', x: pt.x, y: pt.y, value: '' });
       return;
     }
@@ -1211,6 +1264,11 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
 
     const pt = getCanvasPoint(e);
     if (onCursorMove) onCursorMove(pt.x, pt.y);
+
+    if (e.pointerType !== 'touch') {
+      const rect = canvasRef.current ? canvasRef.current.getBoundingClientRect() : { left: 0, top: 0 };
+      setPointerHoverPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    }
 
     // Select Tool Move Handling
     if (tool === 'select') {
@@ -1406,40 +1464,13 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   // High-contrast custom cursors that are 100% visible on both white and dark backgrounds
   const getCanvasCursorStyle = () => {
     if (isSpacePressed || tool === 'pan') {
-      if (isPanningRef.current) {
-        // High-contrast grabbing hand cursor with dark border and white fill (hotspot 12 12)
-        const grabbingSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M6 10c0-2.2 1.8-4 4-4h4c2.2 0 4 1.8 4 4v4c0 3.3-2.7 6-6 6s-6-2.7-6-6v-4z' fill='%23ffffff' stroke='%23ffffff' stroke-width='3' stroke-linejoin='round'/><path d='M6 10c0-2.2 1.8-4 4-4h4c2.2 0 4 1.8 4 4v4c0 3.3-2.7 6-6 6s-6-2.7-6-6v-4z' fill='%23ffffff' stroke='%230f172a' stroke-width='1.8' stroke-linejoin='round'/><line x1='9' y1='6' x2='9' y2='12' stroke='%230f172a' stroke-width='1.5' stroke-linecap='round'/><line x1='12' y1='6' x2='12' y2='12' stroke='%230f172a' stroke-width='1.5' stroke-linecap='round'/><line x1='15' y1='6' x2='15' y2='12' stroke='%230f172a' stroke-width='1.5' stroke-linecap='round'/></svg>`;
-        return `url("data:image/svg+xml,${encodeURIComponent(grabbingSvg)}") 12 12, grabbing`;
-      }
-      // High-contrast open hand grab cursor with dark border and white fill (hotspot 12 12)
-      const grabSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M8 3a1.5 1.5 0 0 1 1.5 1.5V9h.8V2a1.5 1.5 0 0 1 3 0v7h.8V3a1.5 1.5 0 0 1 3 0v6h.8V5.5a1.5 1.5 0 0 1 3 0v8.5c0 4.4-3.6 8-8 8s-8-3.6-8-8v-6a1.5 1.5 0 0 1 3 0v3h.8V4.5A1.5 1.5 0 0 1 8 3z' fill='%23ffffff' stroke='%23ffffff' stroke-width='3' stroke-linejoin='round'/><path d='M8 3a1.5 1.5 0 0 1 1.5 1.5V9h.8V2a1.5 1.5 0 0 1 3 0v7h.8V3a1.5 1.5 0 0 1 3 0v6h.8V5.5a1.5 1.5 0 0 1 3 0v8.5c0 4.4-3.6 8-8 8s-8-3.6-8-8v-6a1.5 1.5 0 0 1 3 0v3h.8V4.5A1.5 1.5 0 0 1 8 3z' fill='%23ffffff' stroke='%230f172a' stroke-width='1.8' stroke-linejoin='round'/></svg>`;
-      return `url("data:image/svg+xml,${encodeURIComponent(grabSvg)}") 12 12, grab`;
+      return isPanningRef.current ? BASE64_CURSORS.grabbing : BASE64_CURSORS.grab;
     }
-    if (tool === 'select') {
-      // High-contrast pointer arrow with dark border (hotspot 3 3)
-      const selectSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M3 3l6.5 16.5 2.8-6.2 6.2-2.8L3 3z' fill='%23ffffff' stroke='%23ffffff' stroke-width='3' stroke-linejoin='round'/><path d='M3 3l6.5 16.5 2.8-6.2 6.2-2.8L3 3z' fill='%23ffffff' stroke='%230f172a' stroke-width='1.8' stroke-linejoin='round'/></svg>`;
-      return `url("data:image/svg+xml,${encodeURIComponent(selectSvg)}") 3 3, default`;
-    }
-    if (tool === 'text') {
-      // High-contrast bold I-beam cursor with black core + white outline (hotspot 12 12)
-      const textSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><line x1='7' y1='3' x2='17' y2='3' stroke='%23ffffff' stroke-width='4' stroke-linecap='round'/><line x1='12' y1='3' x2='12' y2='21' stroke='%23ffffff' stroke-width='4' stroke-linecap='round'/><line x1='7' y1='21' x2='17' y2='21' stroke='%23ffffff' stroke-width='4' stroke-linecap='round'/><line x1='7' y1='3' x2='17' y2='3' stroke='%230f172a' stroke-width='2' stroke-linecap='round'/><line x1='12' y1='3' x2='12' y2='21' stroke='%230f172a' stroke-width='2' stroke-linecap='round'/><line x1='7' y1='21' x2='17' y2='21' stroke='%230f172a' stroke-width='2' stroke-linecap='round'/></svg>`;
-      return `url("data:image/svg+xml,${encodeURIComponent(textSvg)}") 12 12, text`;
-    }
-    if (tool === 'eraser') {
-      // High-contrast circular eraser cursor (coral/red ring with white border and center dot)
-      const eraserSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><circle cx='12' cy='12' r='8' fill='none' stroke='%23ffffff' stroke-width='3'/><circle cx='12' cy='12' r='8' fill='rgba(239,68,68,0.2)' stroke='%23ef4444' stroke-width='1.5'/><circle cx='12' cy='12' r='1.5' fill='%23ef4444'/></svg>`;
-      return `url("data:image/svg+xml,${encodeURIComponent(eraserSvg)}") 12 12, crosshair`;
-    }
-    if (tool === 'laser') {
-      // High-contrast glowing laser cursor
-      const laserSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><circle cx='12' cy='12' r='5' fill='%23ef4444' stroke='%23ffffff' stroke-width='2'/><circle cx='12' cy='12' r='1.5' fill='%23ffffff'/></svg>`;
-      return `url("data:image/svg+xml,${encodeURIComponent(laserSvg)}") 12 12, crosshair`;
-    }
-
-    // High-contrast precision crosshair with dark slate core + crisp white outline
-    // Guaranteed visible on pure white (#ffffff), dark mode (#0f172a), and any color
-    const crosshairSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><circle cx='12' cy='12' r='2' fill='%230f172a' stroke='%23ffffff' stroke-width='1.5'/><line x1='12' y1='2' x2='12' y2='8' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/><line x1='12' y1='16' x2='12' y2='22' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/><line x1='2' y1='12' x2='8' y2='12' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/><line x1='16' y1='12' x2='22' y2='12' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/><line x1='12' y1='2' x2='12' y2='8' stroke='%230f172a' stroke-width='1.5' stroke-linecap='round'/><line x1='12' y1='16' x2='12' y2='22' stroke='%230f172a' stroke-width='1.5' stroke-linecap='round'/><line x1='2' y1='12' x2='8' y2='12' stroke='%230f172a' stroke-width='1.5' stroke-linecap='round'/><line x1='16' y1='12' x2='22' y2='12' stroke='%230f172a' stroke-width='1.5' stroke-linecap='round'/></svg>`;
-    return `url("data:image/svg+xml,${encodeURIComponent(crosshairSvg)}") 12 12, crosshair`;
+    if (tool === 'select') return BASE64_CURSORS.select;
+    if (tool === 'text') return BASE64_CURSORS.text;
+    if (tool === 'eraser') return BASE64_CURSORS.eraser;
+    if (tool === 'laser') return BASE64_CURSORS.laser;
+    return BASE64_CURSORS.crosshair;
   };
 
   const canvasCursor = getCanvasCursorStyle();
@@ -1464,9 +1495,73 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        onPointerLeave={onPointerUp}
+        onPointerCancel={(e) => {
+          onPointerUp(e);
+          setPointerHoverPos(null);
+        }}
+        onPointerLeave={(e) => {
+          onPointerUp(e);
+          setPointerHoverPos(null);
+        }}
       />
+
+      {/* On-Canvas High-Contrast Interactive Visual Cursor Follower */}
+      {pointerHoverPos && !isDrawingRef.current && (
+        <div
+          className="pointer-events-none absolute z-30 transform -translate-x-1/2 -translate-y-1/2 select-none flex items-center transition-opacity duration-75"
+          style={{ left: `${pointerHoverPos.x}px`, top: `${pointerHoverPos.y}px` }}
+        >
+          {tool === 'text' ? (
+            <div className="flex items-center">
+              {/* Dual-tone High-contrast I-Beam SVG */}
+              <svg className="w-6 h-6 drop-shadow-md flex-shrink-0" viewBox="0 0 24 24" fill="none">
+                <line x1="7" y1="2" x2="17" y2="2" stroke="#ffffff" strokeWidth="4.5" strokeLinecap="round" />
+                <line x1="12" y1="2" x2="12" y2="22" stroke="#ffffff" strokeWidth="4.5" strokeLinecap="round" />
+                <line x1="7" y1="22" x2="17" y2="22" stroke="#ffffff" strokeWidth="4.5" strokeLinecap="round" />
+                <line x1="7" y1="2" x2="17" y2="2" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" />
+                <line x1="12" y1="2" x2="12" y2="22" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" />
+                <line x1="7" y1="22" x2="17" y2="22" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+              <div className="ml-2.5 px-2.5 py-1 bg-slate-900/90 backdrop-blur-md text-white text-[11px] font-semibold rounded-full shadow-xl border border-slate-700/80 whitespace-nowrap flex items-center space-x-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                <span>Click anywhere to type text</span>
+              </div>
+            </div>
+          ) : isSpacePressed || tool === 'pan' ? (
+            <div className="flex items-center">
+              <svg className="w-7 h-7 drop-shadow-md flex-shrink-0" viewBox="0 0 28 28">
+                <path d="M8 4a1.5 1.5 0 0 1 1.5 1.5V10h1V3a1.5 1.5 0 0 1 3 0v7h1V4a1.5 1.5 0 0 1 3 0v6h1V6.5a1.5 1.5 0 0 1 3 0v9.5c0 4.4-3.6 8-8 8s-8-3.6-8-8v-7a1.5 1.5 0 0 1 3 0v4h1V5.5A1.5 1.5 0 0 1 8 4z" fill="#ffffff" stroke="#0f172a" strokeWidth="2" strokeLinejoin="round"/>
+              </svg>
+              <div className="ml-2.5 px-2.5 py-1 bg-slate-900/90 backdrop-blur-md text-white text-[11px] font-semibold rounded-full shadow-xl border border-slate-700/80 whitespace-nowrap flex items-center space-x-1.5">
+                <span>{isPanningRef.current ? 'Panning...' : 'Click & drag to pan'}</span>
+              </div>
+            </div>
+          ) : tool === 'sticky' ? (
+            <div className="flex items-center">
+              <div className="w-5 h-5 rounded bg-amber-300 border-2 border-slate-900 shadow-md flex-shrink-0" />
+              <div className="ml-2.5 px-2.5 py-1 bg-slate-900/90 backdrop-blur-md text-white text-[11px] font-semibold rounded-full shadow-xl border border-slate-700/80 whitespace-nowrap">
+                Click to place sticky note
+              </div>
+            </div>
+          ) : tool === 'code' ? (
+            <div className="flex items-center">
+              <div className="w-5 h-5 rounded bg-slate-950 border border-sky-400 text-sky-300 text-[10px] font-mono flex items-center justify-center shadow-md flex-shrink-0">
+                {'</>'}
+              </div>
+              <div className="ml-2.5 px-2.5 py-1 bg-slate-900/90 backdrop-blur-md text-white text-[11px] font-semibold rounded-full shadow-xl border border-slate-700/80 whitespace-nowrap">
+                Click to place code card
+              </div>
+            </div>
+          ) : tool === 'stamp' ? (
+            <div className="flex items-center">
+              <span className="text-xl drop-shadow-md flex-shrink-0">{selectedStamp}</span>
+              <div className="ml-2.5 px-2.5 py-1 bg-slate-900/90 backdrop-blur-md text-white text-[11px] font-semibold rounded-full shadow-xl border border-slate-700/80 whitespace-nowrap">
+                Click to stamp
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
 
       {/* Viewport Control Widget (Bottom-Left) */}
       <div className="absolute bottom-4 left-4 z-40 flex items-center space-x-1.5 bg-white/90 backdrop-blur-xl border border-slate-200/80 px-2.5 py-1.5 rounded-2xl shadow-xl shadow-slate-200/50">
@@ -1513,6 +1608,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
         <div
           className="absolute z-40 transform -translate-y-1/2 flex flex-col space-y-1.5 max-w-[90vw]"
           style={{ left: `${cardScreenX}px`, top: `${cardScreenY}px` }}
+          onPointerDown={e => e.stopPropagation()}
         >
           {cardInput.type === 'code' ? (
             <div className="flex flex-col space-y-1.5 bg-slate-900 border-2 border-sky-400 p-2.5 rounded-xl shadow-2xl max-w-[85vw]">
@@ -1584,7 +1680,10 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
               </div>
             </div>
           ) : (
-            <div className="flex items-center space-x-1.5 bg-white/95 border-2 border-blue-500 p-1 rounded-xl shadow-2xl max-w-[85vw]">
+            <div className="flex items-center space-x-2 bg-white border-2 border-blue-600 ring-4 ring-blue-500/20 p-2 rounded-2xl shadow-2xl max-w-[85vw]">
+              <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 font-bold text-sm flex items-center justify-center flex-shrink-0 select-none">
+                T
+              </div>
               <input
                 autoFocus
                 type="text"
@@ -1594,15 +1693,19 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
                   if (e.key === 'Enter') handleCommitCard();
                   if (e.key === 'Escape') setCardInput(null);
                 }}
+                onClick={e => e.stopPropagation()}
                 placeholder="Type text here..."
-                className="px-2 py-1 bg-transparent outline-none font-sans text-slate-800 flex-1 min-w-[140px]"
-                style={{ color, fontSize: `${Math.max(14, (width * 3 || 18) * zoom)}px` }}
+                className="px-2.5 py-1 bg-transparent outline-none font-sans text-slate-900 flex-1 min-w-[160px] font-medium"
+                style={{ color, fontSize: `${Math.max(15, (width * 3 || 18) * zoom)}px` }}
               />
               <button
-                onClick={handleCommitCard}
-                className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow transition-colors flex-shrink-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCommitCard();
+                }}
+                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold rounded-xl shadow-md transition-all flex-shrink-0 cursor-pointer hover:shadow-lg"
               >
-                Add ✓
+                {cardInput.editingStrokeId ? 'Update ✓' : 'Add ✓'}
               </button>
             </div>
           )}
