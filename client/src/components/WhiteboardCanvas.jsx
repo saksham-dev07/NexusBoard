@@ -27,6 +27,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   const isDrawingRef = useRef(false);
   const currentPathRef = useRef([]);
   const strokesRef = useRef(strokes);
+  const redrawAllRef = useRef(null);
   useEffect(() => {
     strokesRef.current = strokes;
   }, [strokes]);
@@ -215,17 +216,21 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     const canvas = canvasRef.current;
     if (!canvas) return null;
 
-    const rect = canvas.getBoundingClientRect();
+    // Ensure inline styles remain 100% so canvas doesn't lock to a fixed pixel size
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+
+    const container = canvas.parentElement;
+    const width = container ? container.clientWidth : (window.innerWidth || 800);
+    const height = container ? container.clientHeight : (window.innerHeight || 600);
     const dpr = window.devicePixelRatio || 1;
 
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    canvas.style.width = `${rect.width}px`;
-    canvas.style.height = `${rect.height}px`;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
 
     if (offscreenCanvasRef.current) {
-      offscreenCanvasRef.current.width = rect.width * dpr;
-      offscreenCanvasRef.current.height = rect.height * dpr;
+      offscreenCanvasRef.current.width = Math.round(width * dpr);
+      offscreenCanvasRef.current.height = Math.round(height * dpr);
     }
 
     const ctx = canvas.getContext('2d');
@@ -375,9 +380,8 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
           img = new Image();
           img.src = stroke.src;
           img.onload = () => {
-            if (canvasRef.current && ctxRef.current) {
-              const rect = canvasRef.current.getBoundingClientRect();
-              drawBackgroundPattern(ctxRef.current, rect.width, rect.height, zoom, panOffset, bgTheme);
+            if (redrawAllRef.current) {
+              redrawAllRef.current(strokesRef.current || []);
             }
           };
           imgCacheRef.current[stroke.src] = img;
@@ -733,11 +737,14 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     const mainCtx = ctxRef.current;
     if (!mainCanvas || !mainCtx) return;
 
-    const rect = mainCanvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
+    redrawAllRef.current = redrawAll;
 
-    // 1. Draw Background Pattern on Main Canvas
-    drawBackgroundPattern(mainCtx, rect.width, rect.height, zoom, panOffset, bgTheme);
+    const dpr = window.devicePixelRatio || 1;
+    const cssWidth = mainCanvas.width / dpr;
+    const cssHeight = mainCanvas.height / dpr;
+
+    // 1. Draw Background Pattern on Main Canvas across entire viewport
+    drawBackgroundPattern(mainCtx, cssWidth, cssHeight, zoom, panOffset, bgTheme);
 
     // 2. Prepare Offscreen Canvas Layer
     const offscreen = offscreenCanvasRef.current || document.createElement('canvas');
@@ -960,18 +967,36 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     setPan: (newPan) => setPanOffset(newPan),
   }));
 
-  // Setup & resize listener
+  // Setup & resize listener with ResizeObserver
   useEffect(() => {
-    setupCanvasContext();
-    redrawAll(strokes);
+    const canvas = canvasRef.current;
+    const container = canvas ? canvas.parentElement : null;
 
     const handleResize = () => {
       setupCanvasContext();
-      redrawAll(strokes);
+      redrawAll(strokesRef.current || strokes);
     };
 
+    handleResize();
+
+    let resizeObserver = null;
+    if (typeof ResizeObserver !== 'undefined' && container) {
+      resizeObserver = new ResizeObserver(() => {
+        handleResize();
+      });
+      resizeObserver.observe(container);
+    }
+
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+
+    return () => {
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
   }, [setupCanvasContext, redrawAll, strokes]);
 
   const onDoubleClick = (e) => {
