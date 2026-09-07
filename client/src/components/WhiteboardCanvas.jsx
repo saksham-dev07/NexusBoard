@@ -54,6 +54,25 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isSpacePressed, setIsSpacePressed] = useState(false);
 
+  const zoomRef = useRef(zoom);
+  const panOffsetRef = useRef(panOffset);
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+  useEffect(() => {
+    panOffsetRef.current = panOffset;
+  }, [panOffset]);
+
+  // Dedicated 2-finger touch gesture tracking
+  const touchGestureRef = useRef({
+    isActive: false,
+    initialDist: 0,
+    initialZoom: 1,
+    initialMid: { x: 0, y: 0 },
+    initialPan: { x: 0, y: 0 },
+    lastGestureEndTime: 0,
+  });
+
   const isPanningRef = useRef(false);
   const startPanRef = useRef({ x: 0, y: 0 });
 
@@ -68,12 +87,6 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    let initialDist = 0;
-    let initialZoom = 1;
-    let initialMid = { x: 0, y: 0 };
-    let initialPan = { x: 0, y: 0 };
-    let isGestureActive = false;
 
     const getTouchDist = (t1, t2) => {
       const dx = t1.clientX - t2.clientX;
@@ -90,21 +103,31 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     };
 
     const handleTouchStart = (e) => {
-      if (e.touches.length === 2) {
+      if (e.touches.length >= 2) {
         e.preventDefault();
-        isGestureActive = true;
-        initialDist = getTouchDist(e.touches[0], e.touches[1]);
-        initialZoom = zoom;
-        initialMid = getTouchMid(e.touches[0], e.touches[1]);
-        initialPan = { ...panOffset };
+        touchGestureRef.current.isActive = true;
+        touchGestureRef.current.initialDist = getTouchDist(e.touches[0], e.touches[1]);
+        touchGestureRef.current.initialZoom = zoomRef.current;
+        touchGestureRef.current.initialMid = getTouchMid(e.touches[0], e.touches[1]);
+        touchGestureRef.current.initialPan = { ...panOffsetRef.current };
+
+        // Abort and wipe any accidental stroke started by the first finger before the 2nd finger touched
+        if (isDrawingRef.current) {
+          isDrawingRef.current = false;
+          currentPathRef.current = [];
+          if (redrawAllRef.current) {
+            redrawAllRef.current(strokesRef.current || []);
+          }
+        }
       }
     };
 
     const handleTouchMove = (e) => {
-      if (e.touches.length === 2 && isGestureActive) {
+      if (e.touches.length >= 2 && touchGestureRef.current.isActive) {
         e.preventDefault();
         const currentDist = getTouchDist(e.touches[0], e.touches[1]);
         const currentMid = getTouchMid(e.touches[0], e.touches[1]);
+        const { initialDist, initialZoom, initialMid, initialPan } = touchGestureRef.current;
 
         if (initialDist > 0) {
           const scale = currentDist / initialDist;
@@ -121,8 +144,13 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
 
     const handleTouchEnd = (e) => {
       if (e.touches.length < 2) {
-        isGestureActive = false;
-        initialDist = 0;
+        if (touchGestureRef.current.isActive) {
+          touchGestureRef.current.lastGestureEndTime = Date.now();
+        }
+        if (e.touches.length === 0) {
+          touchGestureRef.current.isActive = false;
+          touchGestureRef.current.initialDist = 0;
+        }
       }
     };
 
@@ -137,7 +165,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
       canvas.removeEventListener('touchend', handleTouchEnd);
       canvas.removeEventListener('touchcancel', handleTouchEnd);
     };
-  }, [zoom, panOffset]);
+  }, []);
 
   // Text / Sticky / Code card inline input state: { type, x, y, value, editingStrokeId }
   const [cardInput, setCardInput] = useState(null);
@@ -1019,6 +1047,11 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   };
 
   const onPointerDown = (e) => {
+    // If a two-finger pinch/zoom gesture is active or recently ended (cooldown), ignore touch drawing
+    if (touchGestureRef.current.isActive || (Date.now() - touchGestureRef.current.lastGestureEndTime < 350)) {
+      return;
+    }
+
     // Pan trigger (Hand tool, middle-click, or Spacebar + Left Click)
     if (tool === 'pan' || e.button === 1 || isSpacePressed) {
       e.preventDefault();
@@ -1132,6 +1165,18 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   };
 
   const onPointerMove = (e) => {
+    // If two-finger gesture is active or in cooldown, cancel any stroke and ignore
+    if (touchGestureRef.current.isActive || (Date.now() - touchGestureRef.current.lastGestureEndTime < 350)) {
+      if (isDrawingRef.current) {
+        isDrawingRef.current = false;
+        currentPathRef.current = [];
+        if (redrawAllRef.current) {
+          redrawAllRef.current(strokesRef.current || []);
+        }
+      }
+      return;
+    }
+
     if (isPanningRef.current) {
       setPanOffset({
         x: e.clientX - startPanRef.current.x,
@@ -1219,6 +1264,18 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
       try {
         e.target.releasePointerCapture(e.pointerId);
       } catch (err) {}
+    }
+
+    // If two-finger gesture is active or in cooldown, cancel any stroke and ignore
+    if (touchGestureRef.current.isActive || (Date.now() - touchGestureRef.current.lastGestureEndTime < 350)) {
+      if (isDrawingRef.current) {
+        isDrawingRef.current = false;
+        currentPathRef.current = [];
+        if (redrawAllRef.current) {
+          redrawAllRef.current(strokesRef.current || []);
+        }
+      }
+      return;
     }
 
     if (isPanningRef.current) {
