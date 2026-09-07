@@ -1406,13 +1406,24 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   // High-contrast custom cursors that are 100% visible on both white and dark backgrounds
   const getCanvasCursorStyle = () => {
     if (isSpacePressed || tool === 'pan') {
-      return isPanningRef.current ? 'grabbing' : 'grab';
+      if (isPanningRef.current) {
+        // High-contrast grabbing hand cursor with dark border and white fill (hotspot 12 12)
+        const grabbingSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M6 10c0-2.2 1.8-4 4-4h4c2.2 0 4 1.8 4 4v4c0 3.3-2.7 6-6 6s-6-2.7-6-6v-4z' fill='%23ffffff' stroke='%23ffffff' stroke-width='3' stroke-linejoin='round'/><path d='M6 10c0-2.2 1.8-4 4-4h4c2.2 0 4 1.8 4 4v4c0 3.3-2.7 6-6 6s-6-2.7-6-6v-4z' fill='%23ffffff' stroke='%230f172a' stroke-width='1.8' stroke-linejoin='round'/><line x1='9' y1='6' x2='9' y2='12' stroke='%230f172a' stroke-width='1.5' stroke-linecap='round'/><line x1='12' y1='6' x2='12' y2='12' stroke='%230f172a' stroke-width='1.5' stroke-linecap='round'/><line x1='15' y1='6' x2='15' y2='12' stroke='%230f172a' stroke-width='1.5' stroke-linecap='round'/></svg>`;
+        return `url("data:image/svg+xml,${encodeURIComponent(grabbingSvg)}") 12 12, grabbing`;
+      }
+      // High-contrast open hand grab cursor with dark border and white fill (hotspot 12 12)
+      const grabSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M8 3a1.5 1.5 0 0 1 1.5 1.5V9h.8V2a1.5 1.5 0 0 1 3 0v7h.8V3a1.5 1.5 0 0 1 3 0v6h.8V5.5a1.5 1.5 0 0 1 3 0v8.5c0 4.4-3.6 8-8 8s-8-3.6-8-8v-6a1.5 1.5 0 0 1 3 0v3h.8V4.5A1.5 1.5 0 0 1 8 3z' fill='%23ffffff' stroke='%23ffffff' stroke-width='3' stroke-linejoin='round'/><path d='M8 3a1.5 1.5 0 0 1 1.5 1.5V9h.8V2a1.5 1.5 0 0 1 3 0v7h.8V3a1.5 1.5 0 0 1 3 0v6h.8V5.5a1.5 1.5 0 0 1 3 0v8.5c0 4.4-3.6 8-8 8s-8-3.6-8-8v-6a1.5 1.5 0 0 1 3 0v3h.8V4.5A1.5 1.5 0 0 1 8 3z' fill='%23ffffff' stroke='%230f172a' stroke-width='1.8' stroke-linejoin='round'/></svg>`;
+      return `url("data:image/svg+xml,${encodeURIComponent(grabSvg)}") 12 12, grab`;
     }
     if (tool === 'select') {
-      return 'default';
+      // High-contrast pointer arrow with dark border (hotspot 3 3)
+      const selectSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M3 3l6.5 16.5 2.8-6.2 6.2-2.8L3 3z' fill='%23ffffff' stroke='%23ffffff' stroke-width='3' stroke-linejoin='round'/><path d='M3 3l6.5 16.5 2.8-6.2 6.2-2.8L3 3z' fill='%23ffffff' stroke='%230f172a' stroke-width='1.8' stroke-linejoin='round'/></svg>`;
+      return `url("data:image/svg+xml,${encodeURIComponent(selectSvg)}") 3 3, default`;
     }
     if (tool === 'text') {
-      return 'text';
+      // High-contrast bold I-beam cursor with black core + white outline (hotspot 12 12)
+      const textSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><line x1='7' y1='3' x2='17' y2='3' stroke='%23ffffff' stroke-width='4' stroke-linecap='round'/><line x1='12' y1='3' x2='12' y2='21' stroke='%23ffffff' stroke-width='4' stroke-linecap='round'/><line x1='7' y1='21' x2='17' y2='21' stroke='%23ffffff' stroke-width='4' stroke-linecap='round'/><line x1='7' y1='3' x2='17' y2='3' stroke='%230f172a' stroke-width='2' stroke-linecap='round'/><line x1='12' y1='3' x2='12' y2='21' stroke='%230f172a' stroke-width='2' stroke-linecap='round'/><line x1='7' y1='21' x2='17' y2='21' stroke='%230f172a' stroke-width='2' stroke-linecap='round'/></svg>`;
+      return `url("data:image/svg+xml,${encodeURIComponent(textSvg)}") 12 12, text`;
     }
     if (tool === 'eraser') {
       // High-contrast circular eraser cursor (coral/red ring with white border and center dot)
