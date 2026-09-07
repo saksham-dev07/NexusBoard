@@ -188,7 +188,7 @@ export function useWhiteboard({
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [joined, roomId, userName]);
+  }, [joined, roomId, userName, setError]);
 
   const emitDraw = useCallback((strokeData) => {
     if (!socketRef.current) return;

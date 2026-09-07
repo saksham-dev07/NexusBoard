@@ -688,7 +688,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     }
 
     targetCtx.restore();
-  }, [zoom, panOffset, bgTheme]);
+  }, [zoom, panOffset]);
 
   // Redraw all strokes with Zoom, Pan, Offscreen Layering, Selection Bounding Box, and Background Theme applied
   const redrawAll = useCallback((strokeList, extraStroke = null) => {
