@@ -192,12 +192,12 @@ const io = new Server(server, {
 const rateLimits = new Map();
 const RATE_LIMIT_WINDOW = 1000; // 1 second
 const MAX_EVENTS_PER_WINDOW = {
-  draw: 20,
-  cursor: 30,
-  chat: 5,
-  clear: 5,
-  undo: 10,
-  laser: 40
+  draw: 60,
+  cursor: 50,
+  chat: 10,
+  clear: 10,
+  undo: 20,
+  laser: 60
 };
 
 const checkRateLimit = (socketId, eventType) => {

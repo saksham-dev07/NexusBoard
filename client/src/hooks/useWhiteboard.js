@@ -62,9 +62,10 @@ export function useWhiteboard({
     if (!joined || !roomId || !userName) return;
 
     const socket = io(SERVER_URL, {
-      timeout: 5000,
+      transports: ['websocket', 'polling'],
+      timeout: 10000,
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
       reconnectionDelay: 1000,
     });
 

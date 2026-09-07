@@ -26,6 +26,10 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   const ctxRef = useRef(null);
   const isDrawingRef = useRef(false);
   const currentPathRef = useRef([]);
+  const strokesRef = useRef(strokes);
+  useEffect(() => {
+    strokesRef.current = strokes;
+  }, [strokes]);
 
   // In-memory image object cache
   const imgCacheRef = useRef({});
@@ -940,8 +944,15 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
     getCanvas: () => canvasRef.current,
-    redraw: () => redrawAll(strokes),
-    drawStroke: (stroke) => redrawAll(strokes, stroke),
+    redraw: () => redrawAll(strokesRef.current || []),
+    drawStroke: (stroke) => {
+      if (!stroke) return;
+      const exists = (strokesRef.current || []).some(s => s.id === stroke.id);
+      if (!exists) {
+        strokesRef.current = [...(strokesRef.current || []), stroke];
+      }
+      redrawAll(strokesRef.current);
+    },
     resetView: () => {
       setZoom(1);
       setPanOffset({ x: 0, y: 0 });
@@ -1415,20 +1426,27 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
               </div>
             </div>
           ) : (
-            <input
-              autoFocus
-              type="text"
-              value={cardInput.value}
-              onChange={e => setCardInput({ ...cardInput, value: e.target.value })}
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleCommitCard();
-                if (e.key === 'Escape') setCardInput(null);
-              }}
-              onBlur={handleCommitCard}
-              placeholder="Type text here..."
-              className="px-2 py-1 bg-white/95 border-2 border-blue-500 rounded-lg shadow-xl outline-none font-sans text-slate-800 max-w-[80vw]"
-              style={{ color, fontSize: `${Math.max(14, (width * 3 || 18) * zoom)}px` }}
-            />
+            <div className="flex items-center space-x-1.5 bg-white/95 border-2 border-blue-500 p-1 rounded-xl shadow-2xl max-w-[85vw]">
+              <input
+                autoFocus
+                type="text"
+                value={cardInput.value}
+                onChange={e => setCardInput({ ...cardInput, value: e.target.value })}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleCommitCard();
+                  if (e.key === 'Escape') setCardInput(null);
+                }}
+                placeholder="Type text here..."
+                className="px-2 py-1 bg-transparent outline-none font-sans text-slate-800 flex-1 min-w-[140px]"
+                style={{ color, fontSize: `${Math.max(14, (width * 3 || 18) * zoom)}px` }}
+              />
+              <button
+                onClick={handleCommitCard}
+                className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow transition-colors flex-shrink-0"
+              >
+                Add ✓
+              </button>
+            </div>
           )}
         </div>
       )}
