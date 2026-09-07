@@ -20,7 +20,18 @@ export function useWhiteboard({
   const [strokes, setStrokes] = useState([]);
   const [cursors, setCursors] = useState({});
   const [onlineUsers, setOnlineUsers] = useState([]);
-  const [error, setError] = useState(null);
+  const [error, setErrorState] = useState(null);
+  const errorTimeoutRef = useRef(null);
+
+  const setError = useCallback((err) => {
+    setErrorState(err);
+    if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+    if (err) {
+      errorTimeoutRef.current = setTimeout(() => {
+        setErrorState(null);
+      }, 4000);
+    }
+  }, []);
 
   const lastCursorEmit = useRef(Date.now());
   const lastLaserEmit = useRef(Date.now());
@@ -81,7 +92,12 @@ export function useWhiteboard({
     });
 
     socket.on('error', (err) => {
-      setError(`Socket error: ${err.message || err}`);
+      const errMsg = err?.message || err;
+      if (errMsg === 'Invalid room' && roomId && userName) {
+        socket.emit('join-room', { roomId, userName });
+        return;
+      }
+      setError(`Socket error: ${errMsg}`);
     });
 
     // Room sync events

@@ -16,12 +16,12 @@ export default function JoinModal({ onJoin }) {
     setError(null);
 
     try {
-      let targetRoomId = roomId.trim();
+      let targetRoomId = roomId.trim().toUpperCase();
       if (!targetRoomId) {
         const res = await fetch(`${SERVER_URL}/rooms`, { method: 'POST' });
         if (!res.ok) throw new Error('Failed to create room on server');
         const data = await res.json();
-        targetRoomId = data.roomId;
+        targetRoomId = data.roomId.toUpperCase();
       }
       onJoin({ userName: userName.trim(), roomId: targetRoomId });
     } catch (err) {

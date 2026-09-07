@@ -83,8 +83,8 @@ export default function App() {
   });
 
   const handleJoin = ({ userName: name, roomId: room }) => {
-    setUserName(name);
-    setRoomId(room);
+    setUserName(name.trim());
+    setRoomId((room || '').trim().toUpperCase());
     setJoined(true);
   };
 

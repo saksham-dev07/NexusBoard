@@ -219,6 +219,35 @@ const checkRateLimit = (socketId, eventType) => {
   return limit.count <= (MAX_EVENTS_PER_WINDOW[eventType] || 10);
 };
 
+// Validate or auto-associate room for socket operations
+const validateSocketRoom = (socket, incomingRoomId) => {
+  const normIncoming = (incomingRoomId || '').trim().toUpperCase();
+  const socketRoom = (socket.data?.roomId || '').trim().toUpperCase();
+
+  if (socketRoom && (!normIncoming || socketRoom === normIncoming)) {
+    return socketRoom;
+  }
+
+  // Auto-recover room association if socket.data.roomId was delayed during mobile reconnect
+  if (normIncoming) {
+    let room = rooms.get(normIncoming);
+    if (!room) {
+      rooms.set(normIncoming, {
+        id: normIncoming,
+        strokes: [],
+        users: new Map(),
+        createdAt: Date.now(),
+        lastActivity: Date.now()
+      });
+    }
+    socket.join(normIncoming);
+    socket.data = { ...(socket.data || {}), roomId: normIncoming };
+    return normIncoming;
+  }
+
+  return socketRoom || null;
+};
+
 // Socket event handlers
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
@@ -292,8 +321,8 @@ io.on('connection', (socket) => {
         return;
       }
       
-      const { roomId } = data;
-      if (!roomId || !socket.data?.roomId || socket.data.roomId !== roomId) {
+      const roomId = validateSocketRoom(socket, data?.roomId);
+      if (!roomId) {
         socket.emit('error', { message: 'Invalid room' });
         return;
       }
@@ -315,14 +344,15 @@ io.on('connection', (socket) => {
   socket.on('update-stroke', ({ roomId, updatedStroke }) => {
     try {
       if (!checkRateLimit(socket.id, 'draw')) return;
-      if (!roomId || !socket.data?.roomId || socket.data.roomId !== roomId || !updatedStroke?.id) return;
+      const targetRoomId = validateSocketRoom(socket, roomId);
+      if (!targetRoomId || !updatedStroke?.id) return;
       
-      const room = getRoom(roomId);
+      const room = getRoom(targetRoomId);
       if (room) {
         const index = room.strokes.findIndex(s => s.id === updatedStroke.id);
         if (index !== -1) {
           room.strokes[index] = updatedStroke;
-          socket.to(roomId).emit('update-stroke', updatedStroke);
+          socket.to(targetRoomId).emit('update-stroke', updatedStroke);
         }
       }
     } catch (error) {
@@ -333,12 +363,13 @@ io.on('connection', (socket) => {
   socket.on('delete-stroke', ({ roomId, strokeId }) => {
     try {
       if (!checkRateLimit(socket.id, 'clear')) return;
-      if (!roomId || !socket.data?.roomId || socket.data.roomId !== roomId || !strokeId) return;
+      const targetRoomId = validateSocketRoom(socket, roomId);
+      if (!targetRoomId || !strokeId) return;
 
-      const room = getRoom(roomId);
+      const room = getRoom(targetRoomId);
       if (room) {
         room.strokes = room.strokes.filter(s => s.id !== strokeId);
-        io.in(roomId).emit('delete-stroke', { strokeId });
+        io.in(targetRoomId).emit('delete-stroke', { strokeId });
       }
     } catch (error) {
       console.error('Error handling delete-stroke:', error);
@@ -348,14 +379,13 @@ io.on('connection', (socket) => {
   socket.on('clear', (roomId) => {
     try {
       if (!checkRateLimit(socket.id, 'clear')) return;
-      if (!roomId || !socket.data?.roomId || socket.data.roomId !== roomId) {
-        return;
-      }
+      const targetRoomId = validateSocketRoom(socket, roomId);
+      if (!targetRoomId) return;
       
-      const room = getRoom(roomId);
+      const room = getRoom(targetRoomId);
       if (room) {
         room.strokes = [];
-        io.in(roomId).emit('clear');
+        io.in(targetRoomId).emit('clear');
       }
       
     } catch (error) {
@@ -366,14 +396,13 @@ io.on('connection', (socket) => {
   socket.on('undo', ({ roomId }) => {
     try {
       if (!checkRateLimit(socket.id, 'undo')) return;
-      if (!roomId || !socket.data?.roomId || socket.data.roomId !== roomId) {
-        return;
-      }
+      const targetRoomId = validateSocketRoom(socket, roomId);
+      if (!targetRoomId) return;
       
-      const room = getRoom(roomId);
+      const room = getRoom(targetRoomId);
       if (room && room.strokes.length > 0) {
         room.strokes.pop();
-        io.in(roomId).emit('undo', { strokes: room.strokes });
+        io.in(targetRoomId).emit('undo', { strokes: room.strokes });
       }
       
     } catch (error) {
@@ -388,15 +417,14 @@ io.on('connection', (socket) => {
         return;
       }
       
-      if (!roomId || !message || !socket.data?.roomId || socket.data.roomId !== roomId) {
-        return;
-      }
+      const targetRoomId = validateSocketRoom(socket, roomId);
+      if (!targetRoomId || !message) return;
       
       message = message.trim().substring(0, 500);
       if (!message) return;
       
-      socket.to(roomId).emit('chat', {
-        userName: socket.data.userName,
+      socket.to(targetRoomId).emit('chat', {
+        userName: socket.data?.userName || 'Anonymous',
         message,
         timestamp: timestamp || Date.now()
       });
@@ -408,18 +436,17 @@ io.on('connection', (socket) => {
   
   socket.on('cursor', ({ roomId, cursor }) => {
     try {
-      if (!checkRateLimit(socket.id, 'cursor')) {
+      if (!checkRateLimit(socket.id, 'cursor')) return;
+      
+      const targetRoomId = validateSocketRoom(socket, roomId);
+      if (!targetRoomId || !cursor || typeof cursor.x !== 'number' || typeof cursor.y !== 'number') {
         return;
       }
       
-      if (!roomId || !cursor || typeof cursor.x !== 'number' || typeof cursor.y !== 'number' || !socket.data?.roomId || socket.data.roomId !== roomId) {
-        return;
-      }
-      
-      socket.to(roomId).emit('cursor', {
+      socket.to(targetRoomId).emit('cursor', {
         socketId: socket.id,
         cursor: { x: cursor.x, y: cursor.y },
-        userName: socket.data.userName
+        userName: socket.data?.userName || 'User'
       });
       
     } catch (error) {
@@ -430,11 +457,12 @@ io.on('connection', (socket) => {
   socket.on('laser', ({ roomId, point }) => {
     try {
       if (!checkRateLimit(socket.id, 'laser')) return;
-      if (!roomId || !point || typeof point.x !== 'number' || typeof point.y !== 'number' || !socket.data?.roomId || socket.data.roomId !== roomId) {
+      const targetRoomId = validateSocketRoom(socket, roomId);
+      if (!targetRoomId || !point || typeof point.x !== 'number' || typeof point.y !== 'number') {
         return;
       }
       
-      socket.to(roomId).emit('laser', {
+      socket.to(targetRoomId).emit('laser', {
         socketId: socket.id,
         point: { x: point.x, y: point.y },
         color: point.color || '#ef4444'
