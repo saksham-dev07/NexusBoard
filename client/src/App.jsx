@@ -232,7 +232,7 @@ export default function App() {
       } else if (k === 'b') {
         setTool('process');
       } else if (k === 'h') {
-        setTool('database');
+        setTool('pan');
       } else if (k === 'm') {
         setTool('pill');
       } else if (k === 'u') {
@@ -332,7 +332,7 @@ export default function App() {
 
       {/* Interactive Minimap (Bottom-Left above Zoom controls) */}
       {!isPresentationMode && (
-        <div className="absolute bottom-16 left-4 z-40">
+        <div className="hidden sm:block absolute bottom-16 left-4 z-40">
           <Minimap
             strokes={strokes}
             zoom={viewportZoom}

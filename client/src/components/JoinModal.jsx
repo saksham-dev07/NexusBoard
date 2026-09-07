@@ -32,16 +32,16 @@ export default function JoinModal({ onJoin }) {
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 z-50">
-      <div className="bg-white/90 backdrop-blur-xl border border-white/20 p-8 rounded-2xl shadow-2xl w-full max-w-md transition-all duration-300">
-        <div className="flex flex-col items-center mb-6">
-          <div className="w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30 mb-3">
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div className="fixed inset-0 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-3 sm:p-4 z-50">
+      <div className="bg-white/95 sm:bg-white/90 backdrop-blur-xl border border-white/20 p-5 sm:p-8 rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-sm sm:max-w-md transition-all duration-300">
+        <div className="flex flex-col items-center mb-5 sm:mb-6">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30 mb-2.5 sm:mb-3">
+            <svg className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Collaborative Whiteboard</h1>
-          <p className="text-sm text-slate-500 mt-1">Real-time vector sketching & chat</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight text-center">Collaborative Whiteboard</h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5 sm:mt-1 text-center">Real-time vector sketching & chat</p>
         </div>
 
         {error && (

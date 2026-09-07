@@ -59,6 +59,81 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     }
   }, [zoom, panOffset, onViewportChange]);
 
+  // Touch Gestures: 2-finger pinch-to-zoom and 2-finger pan
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    let initialDist = 0;
+    let initialZoom = 1;
+    let initialMid = { x: 0, y: 0 };
+    let initialPan = { x: 0, y: 0 };
+    let isGestureActive = false;
+
+    const getTouchDist = (t1, t2) => {
+      const dx = t1.clientX - t2.clientX;
+      const dy = t1.clientY - t2.clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    };
+
+    const getTouchMid = (t1, t2) => {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (t1.clientX + t2.clientX) / 2 - rect.left,
+        y: (t1.clientY + t2.clientY) / 2 - rect.top,
+      };
+    };
+
+    const handleTouchStart = (e) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        isGestureActive = true;
+        initialDist = getTouchDist(e.touches[0], e.touches[1]);
+        initialZoom = zoom;
+        initialMid = getTouchMid(e.touches[0], e.touches[1]);
+        initialPan = { ...panOffset };
+      }
+    };
+
+    const handleTouchMove = (e) => {
+      if (e.touches.length === 2 && isGestureActive) {
+        e.preventDefault();
+        const currentDist = getTouchDist(e.touches[0], e.touches[1]);
+        const currentMid = getTouchMid(e.touches[0], e.touches[1]);
+
+        if (initialDist > 0) {
+          const scale = currentDist / initialDist;
+          const newZoom = Math.min(Math.max(initialZoom * scale, 0.1), 5.0);
+
+          const newPanX = currentMid.x - (initialMid.x - initialPan.x) * (newZoom / initialZoom);
+          const newPanY = currentMid.y - (initialMid.y - initialPan.y) * (newZoom / initialZoom);
+
+          setZoom(newZoom);
+          setPanOffset({ x: newPanX, y: newPanY });
+        }
+      }
+    };
+
+    const handleTouchEnd = (e) => {
+      if (e.touches.length < 2) {
+        isGestureActive = false;
+        initialDist = 0;
+      }
+    };
+
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+    canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+    canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+
+    return () => {
+      canvas.removeEventListener('touchstart', handleTouchStart);
+      canvas.removeEventListener('touchmove', handleTouchMove);
+      canvas.removeEventListener('touchend', handleTouchEnd);
+      canvas.removeEventListener('touchcancel', handleTouchEnd);
+    };
+  }, [zoom, panOffset]);
+
   // Text / Sticky / Code card inline input state: { type, x, y, value, editingStrokeId }
   const [cardInput, setCardInput] = useState(null);
 
@@ -908,9 +983,12 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   };
 
   const onPointerDown = (e) => {
-    // Pan trigger (middle-click or Spacebar + Left Click)
-    if (e.button === 1 || isSpacePressed) {
+    // Pan trigger (Hand tool, middle-click, or Spacebar + Left Click)
+    if (tool === 'pan' || e.button === 1 || isSpacePressed) {
       e.preventDefault();
+      try {
+        e.target.setPointerCapture(e.pointerId);
+      } catch (err) {}
       isPanningRef.current = true;
       startPanRef.current = { x: e.clientX - panOffset.x, y: e.clientY - panOffset.y };
       return;
@@ -920,6 +998,9 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     if (!ctx) return;
 
     e.preventDefault();
+    try {
+      e.target.setPointerCapture(e.pointerId);
+    } catch (err) {}
     const pt = getCanvasPoint(e);
 
     // Select Tool handling
@@ -1097,7 +1178,13 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     });
   };
 
-  const onPointerUp = () => {
+  const onPointerUp = (e) => {
+    if (e?.target?.releasePointerCapture && e?.pointerId) {
+      try {
+        e.target.releasePointerCapture(e.pointerId);
+      } catch (err) {}
+    }
+
     if (isPanningRef.current) {
       isPanningRef.current = false;
       return;
@@ -1193,15 +1280,17 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
 
   return (
     <div
-      className={`relative w-full h-full overflow-hidden select-none ${
-        isSpacePressed ? 'cursor-grab active:cursor-grabbing' : ''
+      className={`relative w-full h-full overflow-hidden select-none touch-none ${
+        isSpacePressed || tool === 'pan' ? (isPanningRef.current ? 'cursor-grabbing' : 'cursor-grab') : ''
       }`}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
       <canvas
         ref={canvasRef}
-        className="block w-full h-full cursor-crosshair touch-none select-none"
+        className={`block w-full h-full touch-none select-none ${
+          tool === 'pan' || isSpacePressed ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'
+        }`}
         onWheel={handleWheel}
         onDoubleClick={onDoubleClick}
         onPointerDown={onPointerDown}
@@ -1211,7 +1300,19 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
       />
 
       {/* Viewport Control Widget (Bottom-Left) */}
-      <div className="absolute bottom-4 left-4 z-40 flex items-center space-x-1.5 bg-white/85 backdrop-blur-xl border border-slate-200/80 px-3 py-2 rounded-2xl shadow-xl shadow-slate-200/50">
+      <div className="absolute bottom-4 left-4 z-40 flex items-center space-x-1.5 bg-white/90 backdrop-blur-xl border border-slate-200/80 px-2.5 py-1.5 rounded-2xl shadow-xl shadow-slate-200/50">
+        <button
+          onClick={() => onSelectTool && onSelectTool(tool === 'pan' ? 'pen' : 'pan')}
+          title={tool === 'pan' ? 'Switch to Pen (P)' : 'Pan / Move Canvas (H)'}
+          className={`w-7 h-7 rounded-lg font-bold flex items-center justify-center text-sm transition-all ${
+            tool === 'pan' ? 'bg-blue-600 text-white shadow-md scale-105' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+          }`}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11" />
+          </svg>
+        </button>
+        <div className="h-4 w-px bg-slate-200" />
         <button
           onClick={() => setZoom(z => Math.max(0.1, z - 0.1))}
           title="Zoom Out"
@@ -1225,7 +1326,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
             setPanOffset({ x: 0, y: 0 });
           }}
           title="Reset View (100%)"
-          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-mono font-bold rounded-lg transition-colors"
+          className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-mono font-bold rounded-lg transition-colors"
         >
           {Math.round(zoom * 100)}%
         </button>
@@ -1241,11 +1342,11 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
       {/* Inline Text / Sticky / Code Card Overlay Input */}
       {cardInput && (
         <div
-          className="absolute z-40 transform -translate-y-1/2 flex flex-col space-y-1.5"
+          className="absolute z-40 transform -translate-y-1/2 flex flex-col space-y-1.5 max-w-[90vw]"
           style={{ left: `${cardScreenX}px`, top: `${cardScreenY}px` }}
         >
           {cardInput.type === 'code' ? (
-            <div className="flex flex-col space-y-1.5 bg-slate-900 border-2 border-sky-400 p-2.5 rounded-xl shadow-2xl">
+            <div className="flex flex-col space-y-1.5 bg-slate-900 border-2 border-sky-400 p-2.5 rounded-xl shadow-2xl max-w-[85vw]">
               <textarea
                 autoFocus
                 rows={5}
@@ -1260,7 +1361,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
                   }
                 }}
                 placeholder="Write code here..."
-                className="p-2 bg-slate-950 text-sky-300 font-mono text-xs outline-none rounded-lg resize-none w-64 border border-slate-800"
+                className="p-2 bg-slate-950 text-sky-300 font-mono text-xs outline-none rounded-lg resize-none w-64 max-w-[75vw] border border-slate-800"
               />
               <div className="flex justify-end space-x-1.5 pt-0.5">
                 <button
@@ -1279,7 +1380,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
             </div>
           ) : cardInput.type === 'sticky' ? (
             <div
-              className="flex flex-col space-y-1.5 p-2.5 border-2 border-amber-400 rounded-xl shadow-2xl"
+              className="flex flex-col space-y-1.5 p-2.5 border-2 border-amber-400 rounded-xl shadow-2xl max-w-[85vw]"
               style={{ backgroundColor: color === '#000000' ? '#fef08a' : color }}
             >
               <textarea
@@ -1296,7 +1397,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
                   }
                 }}
                 placeholder="Sticky note text..."
-                className="p-2 bg-white/60 text-slate-800 font-sans text-xs outline-none rounded-lg resize-none w-44 border border-black/10"
+                className="p-2 bg-white/60 text-slate-800 font-sans text-xs outline-none rounded-lg resize-none w-44 max-w-[75vw] border border-black/10"
               />
               <div className="flex justify-end space-x-1.5 pt-0.5">
                 <button
@@ -1325,8 +1426,8 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
               }}
               onBlur={handleCommitCard}
               placeholder="Type text here..."
-              className="px-2 py-1 bg-white/95 border-2 border-blue-500 rounded-lg shadow-xl outline-none font-sans text-slate-800"
-              style={{ color, fontSize: `${(width * 3 || 18) * zoom}px` }}
+              className="px-2 py-1 bg-white/95 border-2 border-blue-500 rounded-lg shadow-xl outline-none font-sans text-slate-800 max-w-[80vw]"
+              style={{ color, fontSize: `${Math.max(14, (width * 3 || 18) * zoom)}px` }}
             />
           )}
         </div>

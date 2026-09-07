@@ -42,7 +42,7 @@ export default function ChatSidebar({ messages, onlineUsers, onSendChat }) {
   }
 
   return (
-    <div className="absolute bottom-4 right-4 z-40 w-80 max-h-[calc(100vh-27rem)] h-72 min-h-[14rem] bg-white/90 backdrop-blur-xl border border-slate-200/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-200">
+    <div className="absolute bottom-4 right-4 z-40 w-[calc(100vw-2rem)] max-w-xs sm:w-80 max-h-[50vh] sm:max-h-[calc(100vh-27rem)] h-72 min-h-[14rem] bg-white/95 sm:bg-white/90 backdrop-blur-xl border border-slate-200/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-200">
       {/* Header */}
       <div className="px-4 py-2.5 border-b border-slate-200/80 flex items-center justify-between bg-slate-50/50 flex-shrink-0">
         <div className="flex items-center space-x-2">

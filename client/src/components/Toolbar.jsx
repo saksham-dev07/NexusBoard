@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 
 const PRESET_COLORS = [
   '#000000', // Black
@@ -26,6 +26,7 @@ const CATEGORIZED_TOOLS = [
     category: 'General & Select',
     items: [
       { id: 'select', label: 'Select', key: 'S', icon: 'M15 15l-2 5l-3-3l-3 3l-2-5M3 3l7 18l3-7l7-3L3 3z' },
+      { id: 'pan', label: 'Hand', key: 'H', icon: 'M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11' },
       { id: 'pen', label: 'Pen', key: 'P', icon: 'M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z' },
       { id: 'eraser', label: 'Eraser', key: 'E', icon: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16' },
       { id: 'laser', label: 'Laser', key: 'V', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
@@ -92,6 +93,7 @@ export default function Toolbar({
 }) {
   const activeColors = tool === 'sticky' ? STICKY_COLORS : PRESET_COLORS;
   const imageInputRef = useRef(null);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const handleImageFileChange = (e) => {
     const file = e.target.files[0];
@@ -105,7 +107,48 @@ export default function Toolbar({
   };
 
   return (
-    <div className="absolute top-4 right-4 z-40 flex flex-col space-y-2 bg-white/85 backdrop-blur-xl border border-slate-200/80 p-3 rounded-2xl shadow-xl shadow-slate-200/50 w-80 max-h-[calc(100vh-2rem)] overflow-y-auto transition-all">
+    <>
+      {/* Mobile Floating Toggle Button */}
+      <div className="md:hidden fixed top-2 right-2 z-50">
+        <button
+          onClick={() => setIsMobileOpen(prev => !prev)}
+          className={`p-2 rounded-2xl shadow-xl backdrop-blur-xl border transition-all flex items-center justify-center ${
+            isMobileOpen
+              ? 'bg-slate-900 text-white border-slate-700'
+              : 'bg-white/95 text-blue-600 border-slate-200/80 hover:bg-slate-50'
+          }`}
+          title="Toggle Tools"
+        >
+          {isMobileOpen ? (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>
+          )}
+        </button>
+      </div>
+
+      {/* Main Toolbar Panel */}
+      <div
+        className={`fixed md:absolute top-14 md:top-4 right-2 md:right-4 z-40 flex flex-col space-y-2 bg-white/95 md:bg-white/85 backdrop-blur-xl border border-slate-200/80 p-3 rounded-2xl shadow-2xl md:shadow-xl shadow-slate-200/50 w-[calc(100vw-1rem)] max-w-sm md:w-80 max-h-[calc(100vh-4.5rem)] md:max-h-[calc(100vh-2rem)] overflow-y-auto transition-all ${
+          isMobileOpen ? 'flex animate-fade-in' : 'hidden md:flex'
+        }`}
+      >
+        {/* Mobile Header with Close Button */}
+        <div className="flex md:hidden items-center justify-between pb-1 border-b border-slate-200/80">
+          <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Canvas Tools</span>
+          <button
+            onClick={() => setIsMobileOpen(false)}
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       {/* Categorized Tools Sections (Horizontal Scroll Single Row per Category) */}
       <div className="space-y-2">
         {CATEGORIZED_TOOLS.map(cat => (
@@ -367,6 +410,7 @@ export default function Toolbar({
         </svg>
         <span>Present Mode (F)</span>
       </button>
-    </div>
+      </div>
+    </>
   );
 }
