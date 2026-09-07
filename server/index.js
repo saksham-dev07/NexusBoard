@@ -8,10 +8,12 @@ const port = process.env.PORT || 4000;
 const app = express();
 
 // Middleware
+const corsOrigin = process.env.CLIENT_URL 
+  ? (process.env.CLIENT_URL === '*' ? true : process.env.CLIENT_URL.split(',').map(u => u.trim())) 
+  : true;
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://your-domain.com'] 
-    : true,
+  origin: corsOrigin,
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -143,9 +145,7 @@ app.get('/rooms/:roomId', (req, res) => {
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.NODE_ENV === 'production' 
-      ? ['https://your-domain.com'] 
-      : true,
+    origin: corsOrigin,
     credentials: true
   },
   pingTimeout: 60000,
