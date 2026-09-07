@@ -127,6 +127,15 @@ const addStrokeToRoom = (roomId, stroke) => {
 };
 
 // API Routes
+app.get('/', (req, res) => {
+  res.json({
+    status: 'online',
+    message: 'NexusBoard Socket.IO Server is active!',
+    frontend: 'https://nexus-board-seven.vercel.app',
+    health: '/health'
+  });
+});
+
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
