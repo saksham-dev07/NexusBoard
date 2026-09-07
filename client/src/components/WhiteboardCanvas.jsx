@@ -24,6 +24,22 @@ const BASE64_CURSORS = {
     "url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSI1IiBmaWxsPSIjZWY0NDQ0IiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMi41Ii8+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMS41IiBmaWxsPSIjZmZmZmZmIi8+PC9zdmc+') 12 12, crosshair",
 };
 
+// Tools that legitimately support text editing (pen/drawing lines are NOT text editable)
+const TEXT_EDITABLE_TOOLS = new Set([
+  'text',
+  'sticky',
+  'code',
+  'rectangle',
+  'circle',
+  'triangle',
+  'star',
+  'decision',
+  'process',
+  'database',
+  'pill',
+  'cloud',
+]);
+
 const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   {
     tool,
@@ -124,6 +140,18 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
 
   // Text / Sticky / Code card inline input state: { type, x, y, value, editingStrokeId }
   const [cardInput, setCardInput] = useState(null);
+  const textInputRef = useRef(null);
+
+  // Guarantee instant auto-focus for text typing whenever the text card opens
+  useEffect(() => {
+    if (cardInput && cardInput.type !== 'sticky' && cardInput.type !== 'code') {
+      const timer = setTimeout(() => {
+        textInputRef.current?.focus();
+        textInputRef.current?.select();
+      }, 25);
+      return () => clearTimeout(timer);
+    }
+  }, [cardInput]);
 
   // Laser points ref: array of { x, y, timestamp, color }
   const laserTrailRef = useRef([]);
@@ -680,6 +708,15 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
         const start = path[0];
         const end = path[path.length - 1];
         targetCtx.strokeRect(start.x, start.y, end.x - start.x, end.y - start.y);
+        if (stroke.text) {
+          targetCtx.save();
+          targetCtx.fillStyle = strokeColor;
+          targetCtx.font = '13px Inter, sans-serif';
+          targetCtx.textAlign = 'center';
+          targetCtx.textBaseline = 'middle';
+          targetCtx.fillText(stroke.text, (start.x + end.x) / 2, (start.y + end.y) / 2);
+          targetCtx.restore();
+        }
       }
     } else if (stroke.tool === 'circle') {
       if (path.length >= 2) {
@@ -692,6 +729,15 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
         targetCtx.beginPath();
         targetCtx.ellipse(cx, cy, Math.abs(rx), Math.abs(ry), 0, 0, 2 * Math.PI);
         targetCtx.stroke();
+        if (stroke.text) {
+          targetCtx.save();
+          targetCtx.fillStyle = strokeColor;
+          targetCtx.font = '13px Inter, sans-serif';
+          targetCtx.textAlign = 'center';
+          targetCtx.textBaseline = 'middle';
+          targetCtx.fillText(stroke.text, cx, cy);
+          targetCtx.restore();
+        }
       }
     } else if (stroke.tool === 'line') {
       if (path.length >= 2) {
@@ -1006,13 +1052,18 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   }, [setupCanvasContext, redrawAll, strokes]);
 
   const onDoubleClick = (e) => {
+    // When using freehand drawing tools (pen, laser, eraser), ignore double-clicks so drawing is never interrupted
+    if (tool === 'pen' || tool === 'laser' || tool === 'eraser') {
+      return;
+    }
+
     const pt = getCanvasPoint(e);
     const clickedStroke = [...(strokes || [])].reverse().find(s => {
       const box = getStrokeBoundingBox(s);
       return box && pt.x >= box.x && pt.x <= box.x + box.width && pt.y >= box.y && pt.y <= box.y + box.height;
     });
 
-    if (clickedStroke && clickedStroke.tool !== 'image' && clickedStroke.tool !== 'stamp') {
+    if (clickedStroke && TEXT_EDITABLE_TOOLS.has(clickedStroke.tool)) {
       const startPt = clickedStroke.path[0] || pt;
       setCardInput({
         type: clickedStroke.tool,
@@ -1020,6 +1071,17 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
         y: startPt.y,
         value: clickedStroke.text || '',
         editingStrokeId: clickedStroke.id,
+      });
+      return;
+    }
+
+    // Double-clicking on canvas in select or text mode creates a new text element
+    if (tool === 'text' || tool === 'select') {
+      setCardInput({
+        type: 'text',
+        x: pt.x,
+        y: pt.y,
+        value: '',
       });
     }
   };
@@ -1615,6 +1677,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
                 T
               </div>
               <input
+                ref={textInputRef}
                 autoFocus
                 type="text"
                 value={cardInput.value}
@@ -1625,8 +1688,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
                 }}
                 onClick={e => e.stopPropagation()}
                 placeholder="Type text here..."
-                className="px-2.5 py-1 bg-transparent outline-none font-sans text-slate-900 flex-1 min-w-[160px] font-medium"
-                style={{ color, fontSize: `${Math.max(15, (width * 3 || 18) * zoom)}px` }}
+                className="px-2.5 py-1.5 bg-transparent outline-none font-sans text-slate-900 text-sm flex-1 min-w-[160px] font-medium"
               />
               <button
                 onClick={(e) => {
