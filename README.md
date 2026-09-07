@@ -10,10 +10,13 @@
 ![Concurrent Users](https://img.shields.io/badge/Concurrent_Users-50%2Froom_(100+_cluster)-blueviolet)
 ![Sync Latency](https://img.shields.io/badge/Sync_Latency-<5ms_(p50:_0.56ms)-success)
 ![Freehand Drawing](https://img.shields.io/badge/Drawing_Engine-60_FPS_Locked-orange)
+![Live Demo](https://img.shields.io/badge/Live_Demo-nexus--board--seven.vercel.app-blue?logo=vercel&logoColor=white)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 
 <p align="center">
   <b>NexusBoard is a high-performance, multi-user real-time collaborative infinite canvas built with React, HTML5 Canvas 2D API, Tailwind CSS, Node.js, and Socket.IO. Benchmarked at 50 concurrent users/room (100+ cluster-wide), sub-5ms sync latency (median 0.56ms), and a rock-solid 60 FPS freehand vector drawing engine.</b>
+  <br /><br />
+  🚀 <b>Live Application: <a href="https://nexus-board-seven.vercel.app" target="_blank">nexus-board-seven.vercel.app</a></b>
 </p>
 
 ![NexusBoard Preview](./nexusboard-preview.png)
@@ -25,6 +28,8 @@
 ## 📌 Table of Contents
 
 - [🌟 Features Overview](#-features-overview)
+- [📱 Mobile & Multi-Touch Gestures](#-mobile--multi-touch-gestures)
+- [🎯 High-Contrast Dual-Tone Cursors](#-high-contrast-dual-tone-cursors)
 - [🏗️ System Architecture](#️-system-architecture)
 - [📊 Technical Benchmarks & Performance Profile](#-technical-benchmarks--performance-profile)
 - [🛠️ Tech Stack](#️-tech-stack)
@@ -41,24 +46,42 @@
 ### 🎨 1. Vector Drawing & Categorized Tool Suite
 - **🗂️ Single-Row Horizontal Scroll Categories**: Compact 4-category tool palette with horizontal scrollbars (`General & Select`, `Cards & Notes`, `Flowchart Suite`, `Shapes & Lines`).
 - **↖️ Select Tool (`S`)**: Single-object & marquee box selection, bounding box corner handle resizing, real-time object dragging, and `Delete`/`Backspace` key removal.
-- **✏️ Pen Tool (`P`)**: Smooth vector drawing with custom color swatches and stroke thickness control (1px to 50px).
+- **✏️ Pen Tool (`P`)**: Smooth vector drawing with custom color swatches and stroke thickness control (1px to 50px). Double-click ignore logic prevents accidental edit dialogs while sketching.
+- **✋ Dedicated Hand / Pan Tool (`H`)**: Navigate across the infinite canvas with single-finger touch or mouse drag without drawing. Includes a 1-tap quick toggle on the bottom-left viewport widget.
 - **🎨 Line Style Selector**: Toggle between Solid (`──`), Dashed (`╌`), and Dotted (`┈`) stroke patterns across shapes and lines.
 - **🧹 Grid-Preserving Eraser (`E`)**: Erases vector drawings using offscreen double-buffering without destroying the background grid pattern.
-- **📌 Digital Sticky Notes (`N`)**: 5 pastel color presets (Yellow, Pink, Cyan, Green, Purple) with double-click inline text editing.
+- **📌 Digital Sticky Notes (`N`)**: 5 pastel color presets (Yellow, Pink, Cyan, Green, Purple) with inline text editing and auto-focus.
 - **💻 Code Snippet Cards (`K`)**: Dark slate code cards (`#0f172a`) with macOS window controls, language labels, and monospaced code editing.
+- **🔤 Smart Text Tool (`T`) & In-Place Editing**:
+  - Click anywhere to spawn a high-contrast text input box with automatic cursor focus.
+  - Double-click on existing text or labeled shapes to edit instantly.
+  - Automatic `textBaseline = 'top'` rendering and character-count dynamic bounding box calculation.
 - **🖼️ Image Upload & Drag-and-Drop**: Viewport-center spawning, natural aspect ratio calculation, drag & drop image ingestion, and corner handle resizing.
 - **😍 Emoji Stamps Palette (`X`)**: Quick visual feedback stamps (`🚀`, `💡`, `✅`, `❌`, `🔥`, `⚠️`, `⭐`, `🎯`).
-- **📊 Flowchart Suite**: Decision Rhombus (`D`), Process Box (`B`), Database Cylinder (`H`), Terminal Pill (`M`), and Cloud Node (`U`).
-- **📐 Shapes & Lines**: Rectangles (`R`), Circles (`C`), Triangles (`I`), Stars (`J`), Lines (`L`), Arrows (`A`), and Text (`T`).
+- **📊 Flowchart Suite**: Decision Rhombus (`D`), Process Box (`B`), Database Cylinder, Terminal Pill (`M`), and Cloud Node (`U`) with automatic centered text labels.
+- **📐 Shapes & Lines**: Rectangles (`R`), Circles (`C`), Triangles (`I`), Stars (`J`), Lines (`L`), and Arrows (`A`).
 - **🪄 Laser Pointer (`V`)**: Glowing transient presentation trail that decays smoothly across connected room users.
 
 ### 🌐 2. Infinite Viewport & Navigation
 - **Cursor-Anchored Zoom**: Mouse wheel zoom (`10%` to `500%`) centered precisely around mouse pointer tip.
-- **Infinite Pan**: `Spacebar + Drag` or `Middle-Click Drag` to navigate unlimited canvas space.
-- **Interactive Minimap Radar**: Floating bottom-left radar widget rendering miniature stroke previews and translucent live camera viewport box. Click or drag to jump camera position.
+- **Infinite Pan**: `Spacebar + Drag`, `Middle-Click Drag`, or Hand tool (`H`) to navigate unlimited canvas space.
+- **Interactive Minimap Radar**: Floating bottom-left radar widget rendering miniature stroke previews and translucent live camera viewport box. Click or drag to jump camera position (automatically hidden on phones to maximize drawing space).
 - **4 Canvas Themes**: `Grid` lines, `Dot-Grid`, `Blank` white, and `Dark Slate` (`#0f172a`).
 
-### ⚡ 3. Real-Time Collaboration & Room System
+### 📱 3. Mobile & Touch-First Multi-Touch Engine
+- **True Two-Finger Pinch Zoom & Pan**: Native pinch-to-zoom scaling and pan translation calculated across pointer coordinates.
+- **Accidental Drawing Prevention**: Single-finger strokes are immediately aborted and wiped the instant a second finger touches the canvas, ensuring two-finger gestures never leave stray pen marks.
+- **Pinch Cooldown Guard**: Enforces a 400ms buffer after lifting fingers to prevent accidental drawing on touch release.
+- **Collapsible Mobile Toolbar**: Floating toggle button with slide-down drawer scaled to phone viewports (`w-[calc(100vw-1rem)] max-w-sm`).
+- **Responsive Navigation Header**: Condensed room ID badge, 1-tap copy link, and compact user counter.
+- **DevTools / Inspect Mode Dynamic Auto-Resize**: High-DPI buffer scaling with `ResizeObserver` and window `orientationchange` listener, eliminating canvas clipping when resizing windows or toggling mobile device mode.
+
+### 🎯 4. High-Contrast Dual-Tone Cursor System
+- **RFC-Compliant Base64 SVG Data URIs**: Replaced problematic URL-encoded SVGs with clean, precomputed Base64 data strings (`BASE64_CURSORS`), eliminating `%23` encoding bugs and CSS `url(...)` syntax failures in Edge/Chromium.
+- **100% Visibility Across White & Dark Backgrounds**: Every cursor state features a dark slate (`#0f172a`) core framed by a crisp 3px–4.5px white (`#ffffff`) outer border.
+- **7 High-Contrast Custom Cursor States**: Precision Crosshair (`pen`, shapes, lines), Dual-Tone I-Beam (`text`), Open Hand (`grab`), Gripping Fist (`grabbing`), Pointer Arrow (`select`), Dual-Ring Eraser (`eraser`), and Glowing Red Laser Dot (`laser`).
+
+### ⚡ 5. Real-Time Collaboration & Room System
 - **Room Isolation**: Unique 8-character Room IDs supporting instant join/create flows.
 - **Concurrent Users Scalability**: Stress-tested up to **50 concurrent users per room** (maximum room saturation) and **100+ concurrent users across cluster rooms** with zero packet loss and zero event loop lag.
 - **Ultra-Low Sync Latency**: Sub-millisecond to sub-5ms broadcast sync latency (**median 0.56ms**, p95: 0.77ms for vector strokes; **0.47ms** for live cursor streaming) over WebSocket transport.
@@ -67,6 +90,52 @@
 - **Expandable Room Chat**: Collapsible chat sidebar with system join/leave notifications.
 - **Import & Export Board State**: Export as high-resolution PNG or JSON, and re-import JSON files to restore boards.
 - **Fullscreen Presentation Mode (`F`)**: Distraction-free presentation view with floating indicator pill.
+
+---
+
+## 📱 Mobile & Multi-Touch Gestures
+
+NexusBoard provides a native-feeling touch experience across smartphones, tablets, iPads, and convertible touchscreen laptops:
+
+### 1. Two-Finger Navigation Pipeline
+- **Pointer-Based Multi-Touch**: Uses a unified `PointerEvent` tracking map (`activePointersRef`) to monitor touch points independently.
+- **Dynamic Pinch-to-Zoom**: Calculates distance delta between finger midpoints (`dist / initialDist`) clamped between `0.1x` (10%) and `5.0x` (500%).
+- **Midpoint Panning**: Centers zoom transformations around the exact geometric center between both fingers.
+- **Accidental Stroke Erasure**: If a user touches one finger down and begins drawing, the millisecond a second finger touches the glass, the partial stroke is immediately discarded (`isDrawingRef.current = false; currentPathRef.current = []`) and the canvas seamlessly transitions into pinch/pan mode.
+- **400ms Pinch Cooldown**: After lifting fingers from a pinch gesture, drawing is locked for 400ms to guarantee no stray dots or lines appear on release.
+
+### 2. Dedicated Hand / Pan Tool (`H`)
+- Mobile users can tap the **Hand tool** (`H`) or the bottom-left quick toggle to drag and navigate with a single finger without needing two-finger gestures.
+- Tapping the toggle again returns instantly to the **Pen** tool.
+
+### 3. Responsive Mobile Layout
+- **Collapsible Drawer Toolbar**: Tapping the floating toolbar icon opens a compact, slide-down drawer designed for small screens (`w-[calc(100vw-1rem)] max-w-sm`), keeping the canvas open and unobstructed.
+- **Screen-Optimized Header**: Room IDs, user counter, and buttons automatically collapse to minimal icons on mobile viewports (<640px).
+- **Auto-Hiding Minimap**: The radar widget is automatically hidden on phone screens to give 100% of screen real estate to the drawing board.
+- **Inspect Mode Auto-Resize**: Responding to DevTools device emulation and viewport rotations through a `ResizeObserver` on the canvas parent, ensuring canvas dimensions never get stuck or clipped.
+
+---
+
+## 🎯 High-Contrast Dual-Tone Cursors
+
+In Microsoft Edge, Google Chrome, and Windows (especially with default Windows I-beam, inverted cursor schemes, or high-contrast settings), system cursors frequently render in white or semi-transparent gray, making them invisible against pure white canvases (`#ffffff`).
+
+### 1. RFC-Compliant Base64 SVG Pipeline
+- Instead of URL-encoded SVG strings (which suffer from `#` double-encoding to `%2523` and premature closing parenthesis bugs), all cursors are compiled into **precomputed Base64 data URIs** (`BASE64_CURSORS`).
+- Base64 uses only alphanumeric characters (`[A-Za-z0-9+/=]`), parsing reliably in 100% of browser engines without syntax failures.
+
+### 2. Dual-Tone Outline Geometry
+Every cursor is engineered with a high-contrast dual-layer technique:
+- **Inner Core**: Deep dark slate (`#0f172a`) for maximum visibility against white backgrounds.
+- **Outer Perimeter**: Crisp `3px` to `4.5px` pure white (`#ffffff`) outer border with rounded caps for maximum visibility against dark mode or colored strokes.
+- **Supported Cursors**:
+  - `crosshair`: Dual-tone crosshair with center targeting dot (Pen, Line, Arrow, Shapes, Flowcharts, Stamp).
+  - `text`: Bold dual-tone I-beam with outer serifs (Text tool).
+  - `grab`: Dual-tone open hand with white fill and dark slate outline (Hand tool idle / Spacebar).
+  - `grabbing`: Dual-tone closed fist with dark slate knuckle lines (Active canvas dragging).
+  - `select`: Crisp pointer arrow with white fill and dark slate outline (Select tool).
+  - `eraser`: Circular eraser reticle with red inner ring, translucent core, and white border.
+  - `laser`: Glowing red laser dot with white outer halo.
 
 ---
 
@@ -352,19 +421,19 @@ Open your browser and navigate to **`http://localhost:3001`**.
 
 ---
 
-## ⌨️ Keyboard & Mouse Shortcuts
+## ⌨️ Keyboard, Mouse & Touch Shortcuts
 
-| Shortcut | Tool / Action | Description |
+| Shortcut / Gesture | Tool / Action | Description |
 | :---: | :--- | :--- |
 | <kbd>S</kbd> | **Select Tool** | Click or drag marquee box to select & resize objects |
-| <kbd>P</kbd> | **Pen Tool** | Freehand vector drawing |
+| <kbd>P</kbd> | **Pen Tool** | Freehand vector drawing (double-click safe) |
+| <kbd>H</kbd> | **Hand / Pan Tool** | Drag across canvas with single-finger touch or mouse |
 | <kbd>E</kbd> | **Eraser Tool** | Grid-preserving stroke eraser |
 | <kbd>N</kbd> | **Sticky Note** | Place colorful digital sticky note |
 | <kbd>K</kbd> | **Code Snippet** | Add syntax-highlighted code card |
 | <kbd>X</kbd> | **Emoji Stamp** | Stamp emojis (`🚀`, `💡`, `✅`, `❌`, `🔥`, `⚠️`, `⭐`, `🎯`) |
 | <kbd>D</kbd> | **Decision Node** | Draw flowchart decision rhombus |
 | <kbd>B</kbd> | **Process Box** | Draw flowchart process box |
-| <kbd>H</kbd> | **Database** | Draw database cylinder shape |
 | <kbd>M</kbd> | **Terminal Pill** | Draw start/end terminal node |
 | <kbd>U</kbd> | **Cloud Node** | Draw cloud service / API node |
 | <kbd>J</kbd> | **Star Badge** | Draw priority star badge shape |
@@ -379,6 +448,9 @@ Open your browser and navigate to **`http://localhost:3001`**.
 | <kbd>Delete</kbd> / <kbd>Backspace</kbd> | **Delete Object** | Remove selected stroke/card/image |
 | <kbd>Space</kbd> + Drag | **Pan Canvas** | Drag across infinite canvas |
 | Mouse Wheel | **Zoom** | Zoom centered around cursor tip |
+| **Two-Finger Pinch** | **Touch Zoom** | Fluid pinch-to-zoom scaling (10% to 500%) |
+| **Two-Finger Drag** | **Touch Pan** | Two-finger canvas navigation (zero pen marks) |
+| **Double-Click** | **Edit / Create Text** | Edit text on existing cards/shapes, or create new text on empty canvas |
 | <kbd>Ctrl</kbd> + <kbd>Z</kbd> | **Undo** | Undo last stroke |
 | <kbd>?</kbd> | **Shortcuts** | Open hotkeys cheat sheet |
 
