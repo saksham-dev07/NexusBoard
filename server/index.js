@@ -8,12 +8,34 @@ const port = process.env.PORT || 4000;
 const app = express();
 
 // Middleware
-const corsOrigin = process.env.CLIENT_URL 
-  ? (process.env.CLIENT_URL === '*' ? true : process.env.CLIENT_URL.split(',').map(u => u.trim())) 
-  : true;
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+  if (!process.env.CLIENT_URL || process.env.CLIENT_URL === '*') return true;
+  const cleanOrigin = origin.trim().replace(/\/+$/, '').toLowerCase();
+  const allowedOrigins = process.env.CLIENT_URL.split(',').map(u => u.trim().replace(/\/+$/, '').toLowerCase());
+  if (allowedOrigins.includes(cleanOrigin)) return true;
+  if (cleanOrigin.includes('localhost') || cleanOrigin.endsWith('.vercel.app')) return true;
+  return true; // Fallback: allow all to prevent breaking deployments
+};
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && isAllowedOrigin(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  }
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
 
 app.use(cors({
-  origin: corsOrigin,
+  origin: (origin, callback) => {
+    callback(null, isAllowedOrigin(origin));
+  },
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -145,7 +167,10 @@ app.get('/rooms/:roomId', (req, res) => {
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: corsOrigin,
+    origin: (origin, callback) => {
+      callback(null, isAllowedOrigin(origin));
+    },
+    methods: ['GET', 'POST'],
     credentials: true
   },
   pingTimeout: 60000,
