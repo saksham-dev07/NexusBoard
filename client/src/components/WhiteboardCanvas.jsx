@@ -169,6 +169,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   // Laser points ref: array of { x, y, timestamp, color }
   const laserTrailRef = useRef([]);
   const animFrameRef = useRef(null);
+  const laserAnimStartRef = useRef(null);
 
   // Convert screen coordinates to world space coordinates
   const getCanvasPoint = useCallback((e) => {
@@ -223,6 +224,24 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
       const approxW = Math.max(32, textLen * (fontSize * 0.62));
       const approxH = Math.max(22, fontSize * 1.3);
       return { x: start.x, y: start.y, width: approxW, height: approxH };
+    }
+
+    // Two-point shapes: rectangle, circle, diamond/decision, process, pill, star, triangle, cloud, line, arrow
+    const TWO_POINT_TOOLS = ['rectangle', 'circle', 'diamond', 'decision', 'process', 'pill', 'star', 'triangle', 'cloud', 'line', 'arrow', 'database'];
+    if (TWO_POINT_TOOLS.includes(stroke.tool) && path.length >= 2) {
+      const start = path[0];
+      const end = path[path.length - 1];
+      const x = Math.min(start.x, end.x);
+      const y = Math.min(start.y, end.y);
+      const w = Math.abs(end.x - start.x);
+      const h = Math.abs(end.y - start.y);
+      const pad = Math.max(8, (stroke.width || 5) / 2);
+      return {
+        x: x - pad,
+        y: y - pad,
+        width: Math.max(16, w + pad * 2),
+        height: Math.max(16, h + pad * 2),
+      };
     }
 
     if (path.length === 0) return null;
@@ -294,6 +313,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     }
 
     if (theme === 'blank') {
+      // blank theme: just the solid fill, no grid
       ctx.restore();
       return;
     }
@@ -303,7 +323,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     const startY = (currentPan.y * dpr) % gridSize;
 
     if (theme === 'dot-grid') {
-      ctx.fillStyle = theme === 'dark-mode' ? '#334155' : '#cbd5e1';
+      ctx.fillStyle = '#cbd5e1';
       for (let x = startX; x < W; x += gridSize) {
         for (let y = startY; y < H; y += gridSize) {
           ctx.beginPath();
@@ -920,6 +940,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
         setSelectedStrokeId(null);
       }
       if (e.code === 'Space') {
+        e.preventDefault();
         setIsSpacePressed(true);
       }
     };
@@ -997,22 +1018,36 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
     const { point, color: laserColor } = remoteLaserEvents;
     if (point) {
       laserTrailRef.current.push({ ...point, timestamp: Date.now(), color: laserColor || '#ef4444' });
+      if (laserAnimStartRef.current) laserAnimStartRef.current();
     }
   }, [remoteLaserEvents]);
 
-  // Continuous animation loop for laser trail decay
+  // Animation loop for laser trail decay - only runs when laser points exist
   useEffect(() => {
+    let running = false;
     const animate = () => {
       if (laserTrailRef.current.length > 0) {
-        redrawAll(strokes);
+        redrawAll(strokesRef.current || []);
+        animFrameRef.current = requestAnimationFrame(animate);
+      } else {
+        running = false;
+        animFrameRef.current = null;
       }
-      animFrameRef.current = requestAnimationFrame(animate);
     };
-    animFrameRef.current = requestAnimationFrame(animate);
+    // Start the loop only when there are laser points
+    const startLoop = () => {
+      if (!running && laserTrailRef.current.length > 0) {
+        running = true;
+        animFrameRef.current = requestAnimationFrame(animate);
+      }
+    };
+    // Expose startLoop so laser events can kick it off
+    laserAnimStartRef.current = startLoop;
     return () => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      running = false;
     };
-  }, [redrawAll, strokes]);
+  }, [redrawAll]);
 
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
@@ -1269,6 +1304,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
 
     if (tool === 'laser') {
       laserTrailRef.current.push({ ...pt, timestamp: Date.now(), color });
+      if (laserAnimStartRef.current) laserAnimStartRef.current();
       if (onLaserMove) onLaserMove(pt.x, pt.y, color);
       return;
     }
@@ -1393,6 +1429,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
 
     if (tool === 'laser' && e.buttons === 1) {
       laserTrailRef.current.push({ ...pt, timestamp: Date.now(), color });
+      if (laserAnimStartRef.current) laserAnimStartRef.current();
       if (onLaserMove) onLaserMove(pt.x, pt.y, color);
       return;
     }
@@ -1742,7 +1779,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
 
       {/* Remote Cursors Overlay */}
       <div className="absolute inset-0 pointer-events-none z-30 overflow-hidden">
-        {Object.entries(cursors).map(([id, { x, y, name, lastSeen }]) => {
+        {Object.entries(cursors || {}).map(([id, { x, y, name, lastSeen }]) => {
           if (Date.now() - (lastSeen || 0) > 5000) return null;
           const screenX = x * zoom + panOffset.x;
           const screenY = y * zoom + panOffset.y;
