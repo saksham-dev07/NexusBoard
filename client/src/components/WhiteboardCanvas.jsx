@@ -145,11 +145,13 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   // Text / Sticky / Code card inline input state: { type, x, y, value, editingStrokeId }
   const [cardInput, setCardInput] = useState(null);
   const textInputRef = useRef(null);
+  const prevCardKeyRef = useRef(null);
 
   // Guarantee instant auto-focus once when text card opens (does not re-select on typing)
-  const cardInputKey = cardInput ? `${cardInput.type}_${cardInput.editingStrokeId || 'new'}` : null;
   useEffect(() => {
-    if (cardInputKey && cardInput && cardInput.type !== 'sticky' && cardInput.type !== 'code') {
+    const key = cardInput ? `${cardInput.type}_${cardInput.editingStrokeId || 'new'}` : null;
+    if (key && key !== prevCardKeyRef.current && cardInput.type !== 'sticky' && cardInput.type !== 'code') {
+      prevCardKeyRef.current = key;
       const timer = setTimeout(() => {
         if (textInputRef.current) {
           textInputRef.current.focus();
@@ -159,7 +161,10 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
       }, 25);
       return () => clearTimeout(timer);
     }
-  }, [cardInputKey]);
+    if (!key) {
+      prevCardKeyRef.current = null;
+    }
+  }, [cardInput]);
 
   // Laser points ref: array of { x, y, timestamp, color }
   const laserTrailRef = useRef([]);
@@ -1035,7 +1040,7 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
 
     const handleResize = () => {
       setupCanvasContext();
-      redrawAll(strokesRef.current || strokes);
+      redrawAll(strokesRef.current || []);
     };
 
     handleResize();
