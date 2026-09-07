@@ -1403,19 +1403,51 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
   const cardScreenX = cardInput ? cardInput.x * zoom + panOffset.x : 0;
   const cardScreenY = cardInput ? cardInput.y * zoom + panOffset.y : 0;
 
+  // High-contrast custom cursors that are 100% visible on both white and dark backgrounds
+  const getCanvasCursorStyle = () => {
+    if (isSpacePressed || tool === 'pan') {
+      return isPanningRef.current ? 'grabbing' : 'grab';
+    }
+    if (tool === 'select') {
+      return 'default';
+    }
+    if (tool === 'text') {
+      return 'text';
+    }
+    if (tool === 'eraser') {
+      // High-contrast circular eraser cursor (coral/red ring with white border and center dot)
+      const eraserSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><circle cx='12' cy='12' r='8' fill='none' stroke='%23ffffff' stroke-width='3'/><circle cx='12' cy='12' r='8' fill='rgba(239,68,68,0.2)' stroke='%23ef4444' stroke-width='1.5'/><circle cx='12' cy='12' r='1.5' fill='%23ef4444'/></svg>`;
+      return `url("data:image/svg+xml,${encodeURIComponent(eraserSvg)}") 12 12, crosshair`;
+    }
+    if (tool === 'laser') {
+      // High-contrast glowing laser cursor
+      const laserSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><circle cx='12' cy='12' r='5' fill='%23ef4444' stroke='%23ffffff' stroke-width='2'/><circle cx='12' cy='12' r='1.5' fill='%23ffffff'/></svg>`;
+      return `url("data:image/svg+xml,${encodeURIComponent(laserSvg)}") 12 12, crosshair`;
+    }
+
+    // High-contrast precision crosshair with dark slate core + crisp white outline
+    // Guaranteed visible on pure white (#ffffff), dark mode (#0f172a), and any color
+    const crosshairSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><circle cx='12' cy='12' r='2' fill='%230f172a' stroke='%23ffffff' stroke-width='1.5'/><line x1='12' y1='2' x2='12' y2='8' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/><line x1='12' y1='16' x2='12' y2='22' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/><line x1='2' y1='12' x2='8' y2='12' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/><line x1='16' y1='12' x2='22' y2='12' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/><line x1='12' y1='2' x2='12' y2='8' stroke='%230f172a' stroke-width='1.5' stroke-linecap='round'/><line x1='12' y1='16' x2='12' y2='22' stroke='%230f172a' stroke-width='1.5' stroke-linecap='round'/><line x1='2' y1='12' x2='8' y2='12' stroke='%230f172a' stroke-width='1.5' stroke-linecap='round'/><line x1='16' y1='12' x2='22' y2='12' stroke='%230f172a' stroke-width='1.5' stroke-linecap='round'/></svg>`;
+    return `url("data:image/svg+xml,${encodeURIComponent(crosshairSvg)}") 12 12, crosshair`;
+  };
+
+  const canvasCursor = getCanvasCursorStyle();
+
   return (
     <div
-      className={`relative w-full h-full overflow-hidden select-none touch-none ${
-        isSpacePressed || tool === 'pan' ? (isPanningRef.current ? 'cursor-grabbing' : 'cursor-grab') : ''
-      }`}
+      className="relative w-full h-full overflow-hidden select-none touch-none"
+      style={{ cursor: canvasCursor }}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
       <canvas
         ref={canvasRef}
-        className={`block w-full h-full touch-none select-none ${
-          tool === 'pan' || isSpacePressed ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'
-        }`}
+        className="block w-full h-full touch-none select-none"
+        style={{
+          width: '100%',
+          height: '100%',
+          cursor: canvasCursor,
+        }}
         onWheel={handleWheel}
         onDoubleClick={onDoubleClick}
         onPointerDown={onPointerDown}
@@ -1569,20 +1601,24 @@ const WhiteboardCanvas = forwardRef(function WhiteboardCanvas(
       {/* Remote Cursors Overlay */}
       <div className="absolute inset-0 pointer-events-none z-30 overflow-hidden">
         {Object.entries(cursors).map(([id, { x, y, name, lastSeen }]) => {
-          if (Date.now() - (lastSeen || 0) > 4000) return null;
+          if (Date.now() - (lastSeen || 0) > 5000) return null;
           const screenX = x * zoom + panOffset.x;
           const screenY = y * zoom + panOffset.y;
           return (
             <div
               key={id}
-              className="absolute transition-all duration-75 ease-out"
-              style={{ left: `${screenX}px`, top: `${screenY}px`, transform: 'translate(-50%, -100%)' }}
+              className="absolute transition-all duration-75 ease-out pointer-events-none select-none"
+              style={{ left: `${screenX}px`, top: `${screenY}px` }}
             >
-              <div className="flex items-center space-x-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[11px] font-semibold px-2 py-0.5 rounded-full shadow-lg">
-                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
-                <span>{name}</span>
+              {/* Pointer Arrow with high-contrast outline */}
+              <svg className="w-5 h-5 -translate-x-1 -translate-y-1 drop-shadow-md text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M4 2l16 7.5-6.5 2.5-2.5 6.5L4 2z" stroke="#0f172a" strokeWidth="1.5" strokeLinejoin="round" />
+              </svg>
+              {/* Name Tag */}
+              <div className="ml-3 -mt-2 flex items-center space-x-1 bg-slate-900/90 text-white text-[11px] font-semibold px-2 py-0.5 rounded-full shadow-lg border border-slate-700/80 whitespace-nowrap">
+                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" />
+                <span>{name || 'Collaborator'}</span>
               </div>
-              <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-blue-600 mx-auto" />
             </div>
           );
         })}
