@@ -30,12 +30,14 @@
 - [🌟 Features Overview](#-features-overview)
 - [📱 Mobile & Multi-Touch Gestures](#-mobile--multi-touch-gestures)
 - [🎯 High-Contrast Dual-Tone Cursors](#-high-contrast-dual-tone-cursors)
-- [🏗️ System Architecture](#️-system-architecture)
+- [🏗️ System Architecture & Offscreen Buffering](#️-system-architecture--offscreen-buffering)
 - [📊 Technical Benchmarks & Performance Profile](#-technical-benchmarks--performance-profile)
-- [🛠️ Tech Stack](#️-tech-stack)
-- [⚡ Quick Start & Installation](#-quick-start--installation)
-- [⌨️ Keyboard & Mouse Shortcuts](#️-keyboard--mouse-shortcuts)
-- [🔌 Socket.IO Event Reference](#-socketio-event-reference)
+- [🌐 REST API Reference](#-rest-api-reference)
+- [🔌 Socket.IO Real-Time Event Reference](#-socketio-real-time-event-reference)
+- [⚙️ Environment Configuration](#️-environment-configuration)
+- [🛠️ Tech Stack & Dependencies](#️-tech-stack--dependencies)
+- [⚡ Quick Start & Local Development](#-quick-start--local-development)
+- [⌨️ Keyboard, Mouse & Touch Shortcuts](#️-keyboard-mouse--touch-shortcuts)
 - [📁 Directory Structure](#-directory-structure)
 - [🤝 Contributing & License](#-contributing--license)
 
@@ -44,42 +46,50 @@
 ## 🌟 Features Overview
 
 ### 🎨 1. Vector Drawing & Categorized Tool Suite
-- **🗂️ Single-Row Horizontal Scroll Categories**: Compact 4-category tool palette with horizontal scrollbars (`General & Select`, `Cards & Notes`, `Flowchart Suite`, `Shapes & Lines`).
-- **↖️ Select Tool (`S`)**: Single-object & marquee box selection, bounding box corner handle resizing, real-time object dragging, and `Delete`/`Backspace` key removal.
-- **✏️ Pen Tool (`P`)**: Smooth vector drawing with custom color swatches and stroke thickness control (1px to 50px). Double-click ignore logic prevents accidental edit dialogs while sketching.
-- **✋ Dedicated Hand / Pan Tool (`H`)**: Navigate across the infinite canvas with single-finger touch or mouse drag without drawing. Includes a 1-tap quick toggle on the bottom-left viewport widget.
-- **🎨 Line Style Selector**: Toggle between Solid (`──`), Dashed (`╌`), and Dotted (`┈`) stroke patterns across shapes and lines.
-- **🧹 Grid-Preserving Eraser (`E`)**: Erases vector drawings using offscreen double-buffering without destroying the background grid pattern.
-- **📌 Digital Sticky Notes (`N`)**: 5 pastel color presets (Yellow, Pink, Cyan, Green, Purple) with inline text editing and auto-focus.
-- **💻 Code Snippet Cards (`K`)**: Dark slate code cards (`#0f172a`) with macOS window controls, language labels, and monospaced code editing.
+- **🗂️ Single-Row Horizontal Scroll Categories**: Compact 4-category tool palette with horizontal scrollbars:
+  - **General & Select**: Select (`S`), Hand / Pan (`H`), Pen (`P`), Eraser (`E`), Laser Pointer (`V`).
+  - **Cards & Notes**: Sticky Note (`N`), Code Card (`K`), Text Tool (`T`), Emoji Stamp (`X`).
+  - **Flowchart Suite**: Decision Rhombus (`D`), Process Box (`B`), Database Cylinder, Terminal Pill (`M`), Cloud Node (`U`).
+  - **Shapes & Lines**: Rectangle (`R`), Circle (`C`), Triangle (`I`), Star Badge (`J`), Line (`L`), Arrow (`A`).
+- **↖️ Select Tool (`S`)**: Single-object & marquee box selection, 4-corner bounding box handle resizing (`tl`, `tr`, `bl`, `br`), real-time drag translation, and `Delete` / `Backspace` key removal.
+- **✏️ Pen Tool (`P`)**: Smooth vector sketching with customizable stroke color presets, HTML5 native color picker, and dynamic stroke width slider (1px to 50px). Double-click ignore logic prevents accidental text spawn dialogs while actively drawing.
+- **✋ Dedicated Hand / Pan Tool (`H`)**: Navigate across the infinite canvas with single-finger touch or mouse drag without drawing. Includes a 1-tap quick toggle on the bottom-left viewport widget to seamlessly alternate between Pen and Pan modes.
+- **🎨 Line Style Selector**: Toggle between Solid (`──`), Dashed (`╌`), and Dotted (`┈`) stroke dash patterns across all shapes and lines.
+- **🧹 Grid-Preserving Eraser (`E`)**: Erases vector drawings using offscreen double-buffering (`destination-out`) without erasing or clipping the background grid pattern.
+- **📌 Digital Sticky Notes (`N`)**: 5 pastel color presets (Yellow `#fef08a`, Pink `#fbcfe8`, Cyan `#bae6fd`, Green `#bbf7d0`, Purple `#e9d5ff`) with top tape accent, multiline text wrapping, corner resizing, and quick `Enter` submit.
+- **💻 Code Snippet Cards (`K`)**: Dark slate code cards (`#0f172a`) with macOS window traffic lights (close, minimize, maximize), language badge (`JAVASCRIPT`), monospaced code formatting, corner resizing, and `Ctrl/Cmd + Enter` quick attach.
 - **🔤 Smart Text Tool (`T`) & In-Place Editing**:
   - Click anywhere to spawn a high-contrast text input box with automatic cursor focus.
-  - Double-click on existing text or labeled shapes to edit instantly.
+  - Double-click on any existing text or labeled shapes to edit instantly.
   - Automatic `textBaseline = 'top'` rendering and character-count dynamic bounding box calculation.
-- **🖼️ Image Upload & Drag-and-Drop**: Viewport-center spawning, natural aspect ratio calculation, drag & drop image ingestion, and corner handle resizing.
+- **🖼️ Image Upload & Drag-and-Drop**: Viewport-center spawning, natural aspect ratio calculation, direct drag & drop of image files onto the canvas surface, and corner handle resizing.
 - **😍 Emoji Stamps Palette (`X`)**: Quick visual feedback stamps (`🚀`, `💡`, `✅`, `❌`, `🔥`, `⚠️`, `⭐`, `🎯`).
 - **📊 Flowchart Suite**: Decision Rhombus (`D`), Process Box (`B`), Database Cylinder, Terminal Pill (`M`), and Cloud Node (`U`) with automatic centered text labels.
-- **📐 Shapes & Lines**: Rectangles (`R`), Circles (`C`), Triangles (`I`), Stars (`J`), Lines (`L`), and Arrows (`A`).
-- **🪄 Laser Pointer (`V`)**: Glowing transient presentation trail that decays smoothly across connected room users.
+- **📐 Shapes & Lines**: Rectangles (`R`), Circles (`C`), Triangles (`I`), Stars (`J`), Lines (`L`), and Directional Arrows (`A`).
+- **🪄 Laser Pointer (`V`)**: Glowing transient presentation trail with decaying alpha (`LASER_LIFETIME = 800ms`) animated smoothly across all connected room users via `requestAnimationFrame`.
 
 ### 🌐 2. Infinite Viewport & Navigation
-- **Cursor-Anchored Zoom**: Mouse wheel zoom (`10%` to `500%`) centered precisely around mouse pointer tip.
+- **Cursor-Anchored Zoom**: Mouse wheel zoom (`10%` to `500%`) centered precisely around mouse pointer tip or trackpad pinch coordinates.
 - **Infinite Pan**: `Spacebar + Drag`, `Middle-Click Drag`, or Hand tool (`H`) to navigate unlimited canvas space.
-- **Interactive Minimap Radar**: Floating bottom-left radar widget rendering miniature stroke previews and translucent live camera viewport box. Click or drag to jump camera position (automatically hidden on phones to maximize drawing space).
-- **4 Canvas Themes**: `Grid` lines, `Dot-Grid`, `Blank` white, and `Dark Slate` (`#0f172a`).
+- **Interactive Minimap Radar**: Floating bottom-left radar widget rendering miniature stroke previews and translucent live camera viewport box. Click or drag on the minimap to instantly jump camera position (automatically hidden on phones to maximize drawing space).
+- **4 Canvas Themes**:
+  - `Grid`: Subtle Cartesian grid lines (`#f1f5f9`).
+  - `Dots`: Minimalist dot-grid pattern (`#cbd5e1`).
+  - `Blank`: Pure clean white canvas (`#ffffff`).
+  - `Dark`: Dark slate background (`#0f172a`) with contrasting grid lines (`#1e293b`).
 
 ### 📱 3. Mobile & Touch-First Multi-Touch Engine
 - **True Two-Finger Pinch Zoom & Pan**: Native pinch-to-zoom scaling and pan translation calculated across pointer coordinates.
-- **Accidental Drawing Prevention**: Single-finger strokes are immediately aborted and wiped the instant a second finger touches the canvas, ensuring two-finger gestures never leave stray pen marks.
+- **Accidental Drawing Prevention**: Single-finger strokes are immediately aborted and discarded the instant a second finger touches the glass, ensuring two-finger gestures never leave stray pen marks.
 - **Pinch Cooldown Guard**: Enforces a 400ms buffer after lifting fingers to prevent accidental drawing on touch release.
 - **Collapsible Mobile Toolbar**: Floating toggle button with slide-down drawer scaled to phone viewports (`w-[calc(100vw-1rem)] max-w-sm`).
 - **Responsive Navigation Header**: Condensed room ID badge, 1-tap copy link, and compact user counter.
-- **DevTools / Inspect Mode Dynamic Auto-Resize**: High-DPI buffer scaling with `ResizeObserver` and window `orientationchange` listener, eliminating canvas clipping when resizing windows or toggling mobile device mode.
+- **DevTools / Inspect Mode Dynamic Auto-Resize**: High-DPI buffer scaling with `ResizeObserver` and window `orientationchange` listener, eliminating canvas clipping when resizing windows or toggling mobile device emulation.
 
 ### 🎯 4. High-Contrast Dual-Tone Cursor System
 - **RFC-Compliant Base64 SVG Data URIs**: Replaced problematic URL-encoded SVGs with clean, precomputed Base64 data strings (`BASE64_CURSORS`), eliminating `%23` encoding bugs and CSS `url(...)` syntax failures in Edge/Chromium.
 - **100% Visibility Across White & Dark Backgrounds**: Every cursor state features a dark slate (`#0f172a`) core framed by a crisp 3px–4.5px white (`#ffffff`) outer border.
-- **7 High-Contrast Custom Cursor States**: Precision Crosshair (`pen`, shapes, lines), Dual-Tone I-Beam (`text`), Open Hand (`grab`), Gripping Fist (`grabbing`), Pointer Arrow (`select`), Dual-Ring Eraser (`eraser`), and Glowing Red Laser Dot (`laser`).
+- **7 High-Contrast Custom Cursor States**: Precision Crosshair (`pen`, shapes, lines, stamps), Dual-Tone I-Beam (`text`), Open Hand (`grab`), Gripping Fist (`grabbing`), Pointer Arrow (`select`), Dual-Ring Eraser (`eraser`), and Glowing Red Laser Dot (`laser`).
 
 ### ⚡ 5. Real-Time Collaboration & Room System
 - **Room Isolation**: Unique 8-character Room IDs supporting instant join/create flows.
@@ -139,20 +149,20 @@ Every cursor is engineered with a high-contrast dual-layer technique:
 
 ---
 
-## 🏗️ System Architecture
+## 🏗️ System Architecture & Offscreen Buffering
 
 ### Offscreen Double-Buffering Layer Pipeline
 
 ```
   ┌─────────────────────────────────────────────────────────────┐
   │                    Main Screen Canvas                       │
-  │  1. Render Background Pattern (Grid / Dots / Dark Theme)    │
+  │  1. Render Background Pattern (Grid / Dots / Blank / Dark)  │
   └──────────────────────────────┬──────────────────────────────┘
                                  │
                                  ▼ Composites
   ┌─────────────────────────────────────────────────────────────┐
   │                 Offscreen Canvas Layer                      │
-  │  2. Render Vector Strokes (Pen, Shapes, Sticky Notes)       │
+  │  2. Render Vector Strokes (Pen, Shapes, Cards, Images)      │
   │  3. Eraser operates using 'destination-out' (Grid Intact)   │
   └──────────────────────────────┬──────────────────────────────┘
                                  │
@@ -272,7 +282,7 @@ Every object emitted across the WebSocket gateway was measured for exact JSON wi
 | **Laser Pointer Telemetry** | Point `{ x, y }` + color hex | `68 bytes` | Tiny transient packet |
 
 #### Real-World Client Bandwidth Consumption:
-- **Continuous Drawing (Worst-Case)**: Emitting at the maximum rate limiter ceiling of `20 strokes/sec` consumes **`~23.89 KB/s`** per active drawer.
+- **Continuous Drawing (Worst-Case)**: Emitting at the rate limiter ceiling of `60 strokes/sec` consumes **`~73.38 KB/s`** per active drawer.
 - **Live Cursor Streaming**: Throttled at `40ms` (~25 FPS) consumes **`~1.25 KB/s`** per active user.
 - **Laser Presentation Streaming**: Throttled at `30ms` (~33 FPS) consumes **`~2.19 KB/s`** per presenter.
 
@@ -352,13 +362,15 @@ To test race conditions and stroke ordering determinism, **10 concurrent users s
 
 1. **Offscreen Double-Buffering Layering**:
    - Isolates vector drawing and erasing (`destination-out`) to an in-memory offscreen canvas before blitting onto the main canvas with a single `drawImage(offscreen, 0, 0)` call.
-   - Prevents background pattern (dots/grid) recomputation on each mouse movement.
+   - Prevents background pattern (grid / dots) recomputation on each mouse movement.
 2. **Dynamic Client Throttling**:
    - Cursor positions are throttled to `40ms` (~25 FPS), and laser pointers to `30ms` (~33 FPS), eliminating WebSocket packet congestion without sacrificing visual smoothness.
 3. **Adaptive Rate Limiting**:
-   - Socket server enforces per-socket rate limits (`20 draw/s`, `30 cursor/s`, `40 laser/s`) within sliding 1-second windows, safeguarding against malicious event flooding or runaway client scripts.
+   - The Socket.IO gateway enforces per-socket rate limits in sliding 1-second windows (`60 draw/s`, `50 cursor/s`, `60 laser/s`, `10 chat/s`, `10 clear/s`, `20 undo/s`), safeguarding against event flooding.
 4. **World-Space Matrix Transform**:
    - Coordinates are stored in pure world space `(x, y)` and projected to screen space using hardware-accelerated context matrices `targetCtx.setTransform(zoom * dpr, 0, 0, zoom * dpr, pan.x * dpr, pan.y * dpr)`, eliminating expensive per-vertex matrix math in JavaScript loops.
+5. **Auto-Recovery on Reconnection**:
+   - `validateSocketRoom(socket, incomingRoomId)` automatically heals room associations even if socket connection parameters are delayed during mobile browser tab sleeps or Wi-Fi switching.
 
 ---
 
@@ -367,32 +379,89 @@ To test race conditions and stroke ordering determinism, **10 concurrent users s
 You can execute the automated 9-suite benchmark locally to verify these metrics on your own hardware:
 
 ```bash
-# Run standalone benchmark suite
+# Run benchmark from repository root
 npm run benchmark
 
-# Or run directly inside server directory
+# Or run directly inside the server directory
 cd server && npm run benchmark
 ```
 
 ---
 
-## 🛠️ Tech Stack
+## 🌐 REST API Reference
 
-| Domain | Technology / Library | Purpose |
-| :--- | :--- | :--- |
-| **Frontend Framework** | React 18 | Declarative component UI state management |
-| **Styling & Theme** | Tailwind CSS | Modern glassmorphism floating UI layout |
-| **Canvas Engine** | HTML5 2D Context API | World matrix transformations (`setTransform`) & offscreen buffering |
-| **Real-time Gateway** | Socket.IO Client | Real-time WebSocket bidirectional event streaming |
-| **Backend Runtime** | Node.js & Express.js | In-memory room manager & socket dispatcher |
-| **Error Handling** | React Error Boundary | Top-level crash interception & recovery |
+The backend exposes a lightweight HTTP REST API alongside the WebSocket gateway:
+
+| Method | Endpoint | Description | Response Example |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/` | Service status, frontend URL, and health endpoint link | `{"status":"online","message":"...","frontend":"..."}` |
+| `GET` | `/health` | Server health, active room count, uptime, and V8 memory usage | `{"status":"ok","rooms":2,"uptime":1420,"memory":{...}}` |
+| `POST` | `/rooms` | Programmatically creates a new unique 8-character Room ID | `{"roomId":"A1B2C3D4"}` |
+| `GET` | `/rooms/:roomId` | Retrieves live metadata for a specific room | `{"roomId":"A1B2C3D4","userCount":4,"strokeCount":85}` |
 
 ---
 
-## ⚡ Quick Start & Installation
+## 🔌 Socket.IO Real-Time Event Reference
+
+| Event Name | Direction | Payload Structure | Description |
+| :--- | :---: | :--- | :--- |
+| `join-room` | Client ➔ Server | `{ roomId: string, userName: string }` | Negotiates room join and socket registration |
+| `room-state` | Server ➔ Client | `{ strokes: Array, users: Array }` | Initial board hydration payload on joining room |
+| `user-joined` | Server ➔ Client | `{ userName: string, users: Array }` | Broadcast to peers when a new collaborator enters |
+| `user-left` | Server ➔ Client | `{ userName: string, socketId: string, users: Array }` | Broadcast when a collaborator disconnects |
+| `draw` | Bi-directional | `{ id, tool, color, width, lineStyle, path, text, src, stamp, ... }` | Emits and broadcasts a newly created vector stroke |
+| `update-stroke` | Bi-directional | Client: `{ roomId, updatedStroke }`<br>Server: `updatedStroke` | Broadcasts stroke modification (drag, resize, text edit) |
+| `delete-stroke` | Bi-directional | Client: `{ roomId, strokeId }`<br>Server: `{ strokeId }` | Removes a selected stroke across all room participants |
+| `clear` | Bi-directional | Client: `roomId`<br>Server: `(empty)` | Clears all strokes in the room buffer |
+| `undo` | Bi-directional | Client: `{ roomId }`<br>Server: `{ strokes: Array }` | Pops the most recent stroke and resynchronizes state |
+| `chat` | Bi-directional | Client: `{ roomId, message, timestamp }`<br>Server: `{ userName, message, timestamp }` | Dispatches a chat message to room collaborators |
+| `cursor` | Bi-directional | Client: `{ roomId, cursor: { x, y } }`<br>Server: `{ socketId, cursor: { x, y }, userName }` | Streams throttled mouse pointer coordinates |
+| `laser` | Bi-directional | Client: `{ roomId, point: { x, y, color } }`<br>Server: `{ socketId, point: { x, y }, color }` | Streams transient presentation laser pointer trail |
+| `error` | Server ➔ Client | `{ message: string }` | Emitted when rate limits or validation errors occur |
+
+---
+
+## ⚙️ Environment Configuration
+
+### Frontend Client (`client/.env`)
+
+| Variable | Default | Purpose |
+| :--- | :--- | :--- |
+| `REACT_APP_SERVER_URL` | `http://localhost:4000` | Backend WebSocket & API endpoint URL |
+| `CI` | `false` | Prevents treating warnings as build failures in CI |
+| `GENERATE_SOURCEMAP` | `false` | Produces lean production bundles |
+
+### Backend Server (`server/.env`)
+
+| Variable | Default | Purpose |
+| :--- | :--- | :--- |
+| `PORT` | `4000` | Server listener port |
+| `CLIENT_URL` | `*` | Allowed CORS origins (comma-separated origins or `*`) |
+| `NODE_ENV` | `development` | Environment mode (`development` / `production`) |
+
+---
+
+## 🛠️ Tech Stack & Dependencies
+
+### Frontend (`client/`)
+- **React 18.3.1**: Modern functional components, hooks, refs, and imperative handles.
+- **HTML5 Canvas 2D API**: Hardware-accelerated 2D context matrix transformations (`setTransform`) and offscreen double-buffering.
+- **Tailwind CSS 3.4.3**: Glassmorphism floating panels, responsive layout utilities, and micro-animations.
+- **Socket.IO Client 4.7.5**: Resilient bidirectional WebSocket transport with automatic reconnection.
+- **React Error Boundary**: Graceful top-level application crash interception and recovery UI.
+
+### Backend (`server/`)
+- **Node.js 18+ / 24+**: High-efficiency V8 event loop execution.
+- **Express 4.19.2**: REST API routing, CORS preflight headers, and JSON body parsing.
+- **Socket.IO 4.7.5**: Room grouping, binary buffer support, ping heartbeats, and WebSocket broadcasting.
+- **UUID 9.0.1**: Unique 8-character Room ID generator and stroke identifier stamping.
+
+---
+
+## ⚡ Quick Start & Local Development
 
 ### Prerequisites
-- **Node.js**: `v16.0.0` or higher
+- **Node.js**: `v16.0.0` or higher (tested on v18, v20, and v24)
 - **npm**: `v8.0.0` or higher
 
 ### 1. Clone the Repository
@@ -405,19 +474,29 @@ cd nexusboard
 ```bash
 npm run install:all
 ```
+*(This concurrently installs dependencies for both `client/` and `server/`).*
 
 ### 3. Launch Development Servers
 
-**Option A — Separate Terminal Windows:**
+**Option A — Run Both Servers (Separate Terminals):**
 ```bash
 # Terminal 1: Backend Server (Port 4000)
 npm run dev:server
 
-# Terminal 2: Frontend Client (Port 3001)
+# Terminal 2: Frontend Client (Port 3000 / 3001)
 npm run dev:client
 ```
 
-Open your browser and navigate to **`http://localhost:3001`**.
+Open your browser and navigate to **`http://localhost:3000`** (or `http://localhost:3001` if port 3000 is occupied).
+
+### 4. Production Build
+```bash
+# Build optimized static bundle for frontend
+npm run build
+
+# Start production server
+npm start
+```
 
 ---
 
@@ -429,8 +508,8 @@ Open your browser and navigate to **`http://localhost:3001`**.
 | <kbd>P</kbd> | **Pen Tool** | Freehand vector drawing (double-click safe) |
 | <kbd>H</kbd> | **Hand / Pan Tool** | Drag across canvas with single-finger touch or mouse |
 | <kbd>E</kbd> | **Eraser Tool** | Grid-preserving stroke eraser |
-| <kbd>N</kbd> | **Sticky Note** | Place colorful digital sticky note |
-| <kbd>K</kbd> | **Code Snippet** | Add syntax-highlighted code card |
+| <kbd>N</kbd> | **Sticky Note** | Place colorful digital sticky note (auto-sets yellow `#fef08a`) |
+| <kbd>K</kbd> | **Code Snippet** | Add syntax-highlighted dark slate code card |
 | <kbd>X</kbd> | **Emoji Stamp** | Stamp emojis (`🚀`, `💡`, `✅`, `❌`, `🔥`, `⚠️`, `⭐`, `🎯`) |
 | <kbd>D</kbd> | **Decision Node** | Draw flowchart decision rhombus |
 | <kbd>B</kbd> | **Process Box** | Draw flowchart process box |
@@ -445,31 +524,17 @@ Open your browser and navigate to **`http://localhost:3001`**.
 | <kbd>T</kbd> | **Text Tool** | Click canvas to type text |
 | <kbd>V</kbd> | **Laser Pointer** | Transient glowing presentation trail |
 | <kbd>F</kbd> | **Presentation** | Toggle clean fullscreen presentation mode |
-| <kbd>Delete</kbd> / <kbd>Backspace</kbd> | **Delete Object** | Remove selected stroke/card/image |
+| <kbd>Delete</kbd> / <kbd>Backspace</kbd> | **Delete Object** | Remove selected stroke/card/shape/image |
+| <kbd>Ctrl</kbd> + <kbd>Z</kbd> / <kbd>Cmd</kbd> + <kbd>Z</kbd> | **Undo** | Undo last stroke |
+| <kbd>?</kbd> / <kbd>Shift</kbd> + <kbd>/</kbd> | **Shortcuts Modal** | Open keyboard shortcuts cheat sheet |
+| <kbd>Esc</kbd> | **Cancel / Close** | Exit presentation mode, close modal, or cancel card input |
 | <kbd>Space</kbd> + Drag | **Pan Canvas** | Drag across infinite canvas |
-| Mouse Wheel | **Zoom** | Zoom centered around cursor tip |
-| **Two-Finger Pinch** | **Touch Zoom** | Fluid pinch-to-zoom scaling (10% to 500%) |
-| **Two-Finger Drag** | **Touch Pan** | Two-finger canvas navigation (zero pen marks) |
-| **Double-Click** | **Edit / Create Text** | Edit text on existing cards/shapes, or create new text on empty canvas |
-| <kbd>Ctrl</kbd> + <kbd>Z</kbd> | **Undo** | Undo last stroke |
-| <kbd>?</kbd> | **Shortcuts** | Open hotkeys cheat sheet |
-
----
-
-## 🔌 Socket.IO Event Reference
-
-| Event Name | Direction | Payload Description |
-| :--- | :---: | :--- |
-| `join-room` | Client ➔ Server | `{ roomId, userName }` |
-| `room-state` | Server ➔ Client | `{ strokes: [], users: [] }` |
-| `draw` | Bi-directional | `{ id, tool, color, width, path, text, src, stamp, ... }` |
-| `update-stroke` | Bi-directional | `{ roomId, updatedStroke }` |
-| `delete-stroke` | Bi-directional | `{ roomId, strokeId }` |
-| `clear` | Bi-directional | `{ roomId }` |
-| `undo` | Bi-directional | `{ roomId }` |
-| `chat` | Bi-directional | `{ roomId, message, timestamp }` |
-| `cursor` | Bi-directional | `{ roomId, cursor: { x, y } }` |
-| `laser` | Bi-directional | `{ roomId, point: { x, y, color } }` |
+| **Middle-Click Drag** | **Pan Canvas** | Drag across canvas with middle mouse button |
+| **Mouse Wheel** | **Zoom** | Zoom centered around cursor tip (10% to 500%) |
+| <kbd>Ctrl</kbd> + Wheel / Pinch | **Trackpad Zoom** | Fluid trackpad pinch-to-zoom scaling |
+| **Two-Finger Pinch** | **Touch Zoom** | Mobile fluid pinch-to-zoom scaling |
+| **Two-Finger Drag** | **Touch Pan** | Two-finger canvas navigation (zero stray pen marks) |
+| **Double-Click** | **Edit / Create Text** | Edit text on cards/shapes, or create new text on empty canvas |
 
 ---
 
@@ -477,28 +542,35 @@ Open your browser and navigate to **`http://localhost:3001`**.
 
 ```text
 nexusboard/
-├── client/                     # Frontend React Application
-│   ├── public/                 # HTML Index & Static Assets
-│   └── src/
-│       ├── components/         # React UI Components
-│       │   ├── WhiteboardCanvas.jsx   # 2D Canvas Engine & Interaction Matrix
-│       │   ├── Toolbar.jsx            # Single-Row Categorized Tool Palette
-│       │   ├── Header.jsx             # Room Info & Action Bar
-│       │   ├── Minimap.jsx            # Interactive Viewport Radar
-│       │   ├── ChatSidebar.jsx        # Expandable Room Chat Drawer
-│       │   ├── JoinModal.jsx          # Room Join / Create Modal
-│       │   ├── ShortcutsModal.jsx     # Hotkeys Reference Table
-│       │   └── ErrorBoundary.jsx      # React Error Boundary Protection
-│       ├── hooks/
-│       │   └── useWhiteboard.js       # Socket.IO Connection & State Hook
-│       ├── App.jsx             # Main Application Layout
-│       ├── index.js            # React Root Entry Point
-│       └── index.css           # Tailwind Utility System & Glassmorphism
-├── server/                     # Backend Node.js / Express Application
-│   ├── index.js                # Express & Socket.IO Room Server
-│   └── package.json            # Server Dependencies
-├── package.json                # Root Scripts Manager
-└── README.md                   # Project Documentation
+├── client/                               # Frontend React Application
+│   ├── public/                           # HTML Index & Static Assets
+│   ├── src/
+│   │   ├── components/                   # React UI Components
+│   │   │   ├── ChatSidebar.jsx           # Expandable Room Chat Drawer
+│   │   │   ├── ErrorBoundary.jsx         # React Error Boundary Protection
+│   │   │   ├── Header.jsx                # Room Info, Actions & Presentation Toggle
+│   │   │   ├── JoinModal.jsx             # Room Join / Create Flow Modal
+│   │   │   ├── Minimap.jsx               # Interactive Viewport Radar Widget
+│   │   │   ├── ShortcutsModal.jsx        # Hotkeys Reference Table
+│   │   │   ├── Toolbar.jsx               # Single-Row Categorized Tool Palette
+│   │   │   └── WhiteboardCanvas.jsx      # 2D Canvas Engine & Interaction Matrix
+│   │   ├── hooks/
+│   │   │   └── useWhiteboard.js          # Socket.IO Connection & State Hook
+│   │   ├── App.jsx                       # Main Application State & Shortcuts
+│   │   ├── index.css                     # Tailwind CSS Utility System & Glassmorphism
+│   │   └── index.js                      # React Root Entry Point
+│   ├── .env                              # Client Environment Variables
+│   ├── .env.production                   # Production Build Settings
+│   ├── package.json                      # Client Dependencies & Scripts
+│   ├── postcss.config.js                 # PostCSS Tailwind Configuration
+│   └── tailwind.config.js                # Tailwind CSS Design Tokens
+├── server/                               # Backend Node.js / Express Application
+│   ├── benchmark.js                      # 9-Suite Performance & Scalability Benchmark
+│   ├── index.js                          # Express & Socket.IO Room Gateway
+│   └── package.json                      # Server Dependencies & Benchmark Scripts
+├── nexusboard-preview.png                # Application UI Screenshot
+├── package.json                          # Root Scripts Manager (install:all, dev, build)
+└── README.md                             # Comprehensive Project Documentation
 ```
 
 ---
